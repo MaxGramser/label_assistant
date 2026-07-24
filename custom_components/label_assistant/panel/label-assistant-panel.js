@@ -399,10 +399,13 @@ ha-icon{--mdc-icon-size:22px}
 .stage{grid-area:stage;position:relative;overflow:auto;
   background-image:radial-gradient(var(--la-line) 1.2px, transparent 1.2px);
   background-size:22px 22px;}
-.stage-inner{min-width:100%;min-height:100%;display:flex;align-items:center;justify-content:center;
-  padding:28px;}
+/* Auto margins (not justify/align) centre the label: identical when it
+   fits, but when the canvas overflows the viewport the margins collapse to
+   0 so nothing gets pushed off-screen unreachably (flex-centred overflow
+   clips the leading edge in a scroll container). */
+.stage-inner{min-width:100%;min-height:100%;display:flex;padding:28px;}
 .label-wrap{position:relative;border-radius:14px;box-shadow:var(--la-shadow);
-  background:#fff;flex:0 0 auto;}
+  background:#fff;flex:0 0 auto;margin:auto;}
 .label-wrap .canvas-holder{border-radius:14px;overflow:hidden;display:block}
 .label-wrap canvas{display:block}
 .guide{position:absolute;background:#ff4fa3;opacity:0;pointer-events:none;z-index:5;transition:opacity .08s}
@@ -579,8 +582,10 @@ ha-icon{--mdc-icon-size:22px}
   .brand>ha-icon{width:auto;flex:0 0 auto}
   .brand span{display:none}
 
-  /* Compact topbar: essentials only. Rotate & B/W live in the toolbar. */
-  .top{gap:0;padding:0 8px 0 4px}
+  /* Compact topbar: essentials only. Rotate & B/W live in the toolbar.
+     Longhand padding only — a shorthand here wipes the base rule's
+     padding-top:env(safe-area-inset-top) and shoves the bar under the notch. */
+  .top{gap:0;padding-left:4px;padding-right:8px}
   .icon-btn{width:40px;height:40px;border-radius:11px}
   #btn-rotate,#btn-bw{display:none}
   .btn span.lbl{display:none}
@@ -632,7 +637,7 @@ ha-icon{--mdc-icon-size:22px}
 }
 @media (max-width: 520px){
   .swatches{grid-template-columns:repeat(6,1fr)}
-  .top{padding:0 6px 0 2px}
+  .top{padding-left:2px;padding-right:6px}
   .name{min-width:48px}
 }
 `;
@@ -902,6 +907,11 @@ class LabelAssistantPanel extends HTMLElement {
 
     const ro = new ResizeObserver(() => { if (!this._userZoom) this._fitZoom(); });
     ro.observe(this.$("stage"));
+    // iOS companion app: safe-area insets/viewport can settle after first
+    // paint without resizing the stage box itself; refit once, late.
+    setTimeout(() => { if (!this._userZoom) this._fitZoom(); }, 600);
+    window.addEventListener("orientationchange", () =>
+      setTimeout(() => { if (!this._userZoom) this._fitZoom(); }, 250));
   }
 
   /* -------------------------------------------------------------- fabric */
