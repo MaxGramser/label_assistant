@@ -391,6 +391,9 @@ ha-icon{--mdc-icon-size:22px}
 .tool.active{background:var(--la-accent);color:#fff;box-shadow:0 4px 12px rgba(108,92,231,.4)}
 .rail .spacer{flex:1}
 .tool.danger:hover{background:rgba(229,57,53,.12);color:#e53935}
+/* Mobile-only rail tools (rotate/B&W/background) and the sheet grab bar. */
+.m-tool{display:none}
+.sheet-head{display:none}
 
 /* ----------------------------------------------------------------- stage */
 .stage{grid-area:stage;position:relative;overflow:auto;
@@ -564,29 +567,73 @@ ha-icon{--mdc-icon-size:22px}
 }
 
 /* ---------------------------------------------------------------- mobile */
+/* Phone layout: topbar / full-height stage / bottom toolbar in the thumb
+   zone. The props panel leaves the grid entirely and becomes a bottom sheet
+   sliding over the stage (host [data-sheet]), so the canvas NEVER resizes
+   when a selection appears. --la-mrail = toolbar height, used as anchor. */
 @media (max-width: 900px){
-  .app{grid-template-rows:auto 1fr auto auto;grid-template-columns:1fr;
-    grid-template-areas:"top" "stage" "props" "rail";}
+  :host{--la-mrail:calc(60px + env(safe-area-inset-bottom));}
+  .app{grid-template-rows:auto 1fr auto;grid-template-columns:1fr;
+    grid-template-areas:"top" "stage" "rail";}
   .menu-slot.has-menu{width:auto;flex:0 0 auto;margin-left:0}
   .brand>ha-icon{width:auto;flex:0 0 auto}
-  .rail{flex-direction:row;justify-content:space-around;border-right:none;
-    border-top:1px solid var(--la-line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
-  .rail .spacer{display:none}
-  .props{border-left:none;border-top:1px solid var(--la-line);max-height:34dvh;padding:12px 16px}
-  .props:empty{display:none}
-  .props .tip{display:none}
-  .props .font-list{max-height:150px}
-  .btn span.lbl{display:none}
-  .btn{padding:0 14px}
-  .name{max-width:none}
   .brand span{display:none}
-  .stage-inner{padding:16px}
+
+  /* Compact topbar: essentials only. Rotate & B/W live in the toolbar. */
+  .top{gap:0;padding:0 8px 0 4px}
+  .icon-btn{width:40px;height:40px;border-radius:11px}
+  #btn-rotate,#btn-bw{display:none}
+  .btn span.lbl{display:none}
+  .btn{padding:0 12px;height:40px;border-radius:12px}
+  .top-actions{gap:4px}
+  .name{max-width:none;font-size:15px;padding:6px 8px}
+
+  /* Bottom toolbar: one horizontally scrollable row, 48px hit targets. */
+  .rail{flex-direction:row;justify-content:flex-start;gap:2px;border-right:none;
+    border-top:1px solid var(--la-line);overflow-x:auto;scrollbar-width:none;
+    padding:6px 10px calc(6px + env(safe-area-inset-bottom));}
+  .rail::-webkit-scrollbar{display:none}
+  .rail .tool{flex:0 0 48px;height:48px}
+  .rail .spacer{display:none}
+  .m-tool{display:flex}
+
+  .stage-inner{padding:14px}
+  .zoom-fabs{right:10px;bottom:10px;gap:4px}
+  .zoom-fabs .icon-btn{width:38px;height:38px}
+  .stage-badge{left:10px;bottom:10px;padding:5px 11px;font-size:11px}
+
+  /* Props bottom sheet. */
+  .props{position:fixed;left:0;right:0;bottom:var(--la-mrail);z-index:40;
+    border-left:none;border-top:1px solid var(--la-line);
+    border-radius:22px 22px 0 0;box-shadow:0 -14px 44px rgba(10,10,40,.22);
+    max-height:46dvh;padding:4px 16px 16px;
+    transform:translateY(calc(100% + var(--la-mrail)));visibility:hidden;
+    transition:transform .24s ease,visibility .24s;}
+  :host([data-sheet]) .props{transform:none;visibility:visible}
+  :host([data-sheet][data-dragging]) .props{transform:translateY(calc(100% + var(--la-mrail)));visibility:hidden}
+  .sheet-head{display:flex;align-items:center;justify-content:center;
+    padding:10px 0 6px;position:sticky;top:0;background:var(--la-card);z-index:2}
+  .sheet-grab{width:44px;height:5px;border-radius:99px;background:var(--la-line)}
+  .sheet-close{position:absolute;right:-6px;top:2px;width:38px;height:38px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;color:var(--la-muted)}
+  .props .tip{display:none}
+  .props .section{margin-bottom:16px}
+  .props .font-list{max-height:32dvh}
+
+  /* Popovers become bottom drawers just above the toolbar. */
+  .popover.mobile{left:8px;right:8px;top:auto;bottom:calc(var(--la-mrail) + 8px);
+    max-width:none;animation:pop-up .16s ease-out}
+  @keyframes pop-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .shape-grid{grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
+  .frame-grid{grid-template-columns:repeat(3,1fr)}
+
   .swatches{grid-template-columns:repeat(8,1fr)}
   .act-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media (max-width: 520px){
   .swatches{grid-template-columns:repeat(6,1fr)}
-  .top{gap:2px;padding:0 8px}
+  .top{padding:0 6px 0 2px}
+  .name{min-width:48px}
 }
 `;
 
@@ -619,7 +666,10 @@ const SHELL = `
     <button class="tool" data-tool="image"><ha-icon icon="mdi:image-plus"></ha-icon></button>
     <button class="tool" data-tool="qr"><ha-icon icon="mdi:qrcode"></ha-icon></button>
     <button class="tool" data-tool="frames"><ha-icon icon="mdi:border-all-variant"></ha-icon></button>
+    <button class="tool m-tool" data-tool="label"><ha-icon icon="mdi:format-color-fill"></ha-icon></button>
     <span class="spacer"></span>
+    <button class="tool m-tool" data-tool="rotate"><ha-icon icon="mdi:phone-rotate-landscape"></ha-icon></button>
+    <button class="tool m-tool" data-tool="bw" id="rail-bw"><ha-icon icon="mdi:invert-colors"></ha-icon></button>
     <button class="tool danger" data-tool="clear"><ha-icon icon="mdi:delete-sweep-outline"></ha-icon></button>
   </div>
 
@@ -764,6 +814,7 @@ class LabelAssistantPanel extends HTMLElement {
       select: "toolSelect", text: "toolText", shapes: "toolShapes",
       stickers: "toolStickers", image: "toolImage", qr: "toolQr",
       frames: "toolFrames", clear: "clearAll",
+      label: "background", rotate: "rotate", bw: "bwPreview",
     };
     this.shadowRoot.querySelectorAll(".tool").forEach((b) => {
       b.title = this.t(toolTips[b.dataset.tool]);
@@ -876,14 +927,22 @@ class LabelAssistantPanel extends HTMLElement {
     });
 
     const c = this._canvas;
-    c.on("selection:created", () => this._renderProps());
-    c.on("selection:updated", () => this._renderProps());
-    c.on("selection:cleared", () => this._renderProps());
+    c.on("selection:created", () => { this._renderProps(); this._openSheet(); });
+    c.on("selection:updated", () => { this._renderProps(); this._openSheet(); });
+    c.on("selection:cleared", () => { this._renderProps(); this._closeSheet(); });
     c.on("object:added", () => this._pushHistory());
     c.on("object:removed", () => this._pushHistory());
     c.on("object:modified", () => this._pushHistory());
-    c.on("object:moving", (e) => this._snap(e));
-    c.on("mouse:up", () => this._hideGuides());
+    // While transforming, tuck the mobile props sheet away so the object
+    // being dragged is never hidden behind it.
+    c.on("object:moving", (e) => { this._snap(e); this.setAttribute("data-dragging", ""); });
+    c.on("object:scaling", () => this.setAttribute("data-dragging", ""));
+    c.on("object:rotating", () => this.setAttribute("data-dragging", ""));
+    c.on("mouse:up", () => { this._hideGuides(); this.removeAttribute("data-dragging"); });
+    // On phones: keep the sheet out of the way while the keyboard is up for
+    // inline text editing; bring the font/color sheet back once typing ends.
+    c.on("text:editing:entered", () => this._closeSheet());
+    c.on("text:editing:exited", () => this._openSheet());
     c.on("after:render", () => { if (this._bwOn) this._updateBwDebounced(); });
     this._fitZoom();
   }
@@ -901,10 +960,16 @@ class LabelAssistantPanel extends HTMLElement {
     this._canvas.requestRenderAll();
   }
 
+  /* On phones the props panel is a bottom sheet over the stage; it opens on
+     selection and slides away on deselect, so the canvas never resizes. */
+  _isMobile() { return window.matchMedia("(max-width: 900px)").matches; }
+  _openSheet() { if (this._isMobile()) this.setAttribute("data-sheet", ""); }
+  _closeSheet() { this.removeAttribute("data-sheet"); }
+
   _fitZoom() {
     if (!this._canvas) return;
     const stage = this.$("stage");
-    const pad = 64;
+    const pad = this._isMobile() ? 26 : 64;
     const { w, h } = this._labelSize();
     this._zoom = clamp(
       Math.min((stage.clientWidth - pad) / w, (stage.clientHeight - pad) / h),
@@ -1030,6 +1095,15 @@ class LabelAssistantPanel extends HTMLElement {
       case "image": this.$("file-input").click(); break;
       case "qr": this._openQrModal(null); break;
       case "frames": this._openFramesPopover(btn); break;
+      // Mobile-only rail tools; their topbar twins are hidden on narrow.
+      case "rotate": this._toggleOrientation(); break;
+      case "bw": this._toggleBw(); break;
+      case "label":
+        this._canvas.discardActiveObject();
+        this._canvas.requestRenderAll();
+        this._renderProps();
+        this._openSheet();
+        break;
       case "clear":
         if (confirm(this.t("confirmClear"))) {
           this._canvas.discardActiveObject();
@@ -1260,18 +1334,18 @@ class LabelAssistantPanel extends HTMLElement {
     pop.className = "popover";
     pop.innerHTML = html;
     this.shadowRoot.appendChild(pop);
+    if (this._isMobile()) {
+      // Phones get a bottom drawer just above the toolbar instead of a
+      // floating bubble; position comes from CSS (.popover.mobile).
+      pop.classList.add("mobile");
+      this._popover = pop;
+      return pop;
+    }
     const rect = btn.getBoundingClientRect();
-    const mobile = window.innerWidth <= 900;
     // Measure after insert, then clamp inside the viewport.
     const pw = pop.offsetWidth, ph = pop.offsetHeight;
-    let left, top;
-    if (mobile) {
-      left = clamp(rect.left + rect.width / 2 - pw / 2, 8, window.innerWidth - pw - 8);
-      top = clamp(rect.top - ph - 10, 8, window.innerHeight - ph - 8);
-    } else {
-      left = clamp(rect.right + 12, 8, window.innerWidth - pw - 8);
-      top = clamp(rect.top - 8, 8, window.innerHeight - ph - 8);
-    }
+    const left = clamp(rect.right + 12, 8, window.innerWidth - pw - 8);
+    const top = clamp(rect.top - 8, 8, window.innerHeight - ph - 8);
     pop.style.left = `${left}px`;
     pop.style.top = `${top}px`;
     this._popover = pop;
@@ -1389,7 +1463,7 @@ class LabelAssistantPanel extends HTMLElement {
     const strokeMain = single && !isText &&
       (single.stroke && (!single.fill || single.fill === ""));
 
-    let html = "";
+    let html = this._sheetHeadHtml();
 
     if (isQr) {
       html += `<div class="section">
@@ -1458,7 +1532,21 @@ class LabelAssistantPanel extends HTMLElement {
     </div>`;
 
     el.innerHTML = html;
+    this._wireSheetHead(el);
     this._wireProps(objs, { single, isText, strokeMain });
+  }
+
+  /* Grab bar + close chevron for the mobile bottom sheet (hidden on desktop). */
+  _sheetHeadHtml() {
+    return `<div class="sheet-head">
+      <span class="sheet-grab"></span>
+      <button class="sheet-close" data-sheet-close><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+    </div>`;
+  }
+
+  _wireSheetHead(el) {
+    const btn = el.querySelector("[data-sheet-close]");
+    if (btn) btn.addEventListener("click", () => this._closeSheet());
   }
 
   _swatchesHtml(idPrefix, current, { allowNone } = {}) {
@@ -1622,6 +1710,7 @@ class LabelAssistantPanel extends HTMLElement {
   _renderLabelProps(el) {
     const bg = this._canvas ? this._canvas.backgroundColor : "#ffffff";
     el.innerHTML = `
+      ${this._sheetHeadHtml()}
       <div class="section">
         <h3><ha-icon icon="mdi:sticker-outline"></ha-icon>${esc(this.t("propsLabel"))}</h3>
         <div class="tip">${esc(this.t("tipEmpty"))}</div>
@@ -1630,6 +1719,7 @@ class LabelAssistantPanel extends HTMLElement {
         <h3><ha-icon icon="mdi:format-color-fill"></ha-icon>${esc(this.t("background"))}</h3>
         ${this._swatchesHtml("p-bg", bg, { allowNone: false })}
       </div>`;
+    this._wireSheetHead(el);
     this._wireSwatches(el, "p-bg", (color) => {
       this._canvas.setBackgroundColor(color || "#ffffff", () => {
         this._canvas.requestRenderAll();
@@ -1922,6 +2012,8 @@ class LabelAssistantPanel extends HTMLElement {
   _toggleBw() {
     this._bwOn = !this._bwOn;
     this.$("btn-bw").classList.toggle("active", this._bwOn);
+    const railBw = this.$("rail-bw");
+    if (railBw) railBw.classList.toggle("active", this._bwOn);
     this.$("bw-overlay").classList.toggle("on", this._bwOn);
     if (this._bwOn) this._updateBw();
   }
