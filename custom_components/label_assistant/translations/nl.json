@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Label Assistant",
+        "description": "Ontwerp en print labels op je DYMO LabelWriter. Stel de printer-URL in bij de opties na installatie (standaard de Label Printer add-on)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Label Assistant is al geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Label Assistant instellingen",
+        "data": {
+          "printer_url": "Printer add-on URL"
+        },
+        "data_description": {
+          "printer_url": "HTTP-adres van de generieke Label Printer add-on, bv. http://local-label-printer:8000"
+        }
+      }
+    }
+  }
+}

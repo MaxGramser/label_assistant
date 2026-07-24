@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Label Assistant",
+        "description": "Design and print labels on your DYMO LabelWriter. Set the printer URL in the options after setup (defaults to the Label Printer add-on)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Label Assistant is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Label Assistant settings",
+        "data": {
+          "printer_url": "Printer add-on URL"
+        },
+        "data_description": {
+          "printer_url": "HTTP address of the generic Label Printer add-on, e.g. http://local-label-printer:8000"
+        }
+      }
+    }
+  }
+}
