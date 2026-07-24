@@ -573,9 +573,9 @@ ha-icon{--mdc-icon-size:22px}
 /* Phone layout: topbar / full-height stage / bottom toolbar in the thumb
    zone. The props panel leaves the grid entirely and becomes a bottom sheet
    sliding over the stage (host [data-sheet]), so the canvas NEVER resizes
-   when a selection appears. --la-mrail = toolbar height, used as anchor. */
+   when a selection appears. Sheet/drawer anchors use literal offsets with
+   env() fallbacks (a failed CSS var would strand them off-screen). */
 @media (max-width: 900px){
-  :host{--la-mrail:calc(60px + env(safe-area-inset-bottom));}
   .app{grid-template-rows:auto 1fr auto;grid-template-columns:1fr;
     grid-template-areas:"top" "stage" "rail";}
   .menu-slot.has-menu{width:auto;flex:0 0 auto;margin-left:0}
@@ -607,15 +607,15 @@ ha-icon{--mdc-icon-size:22px}
   .zoom-fabs .icon-btn{width:38px;height:38px}
   .stage-badge{left:10px;bottom:10px;padding:5px 11px;font-size:11px}
 
-  /* Props bottom sheet. */
-  .props{position:fixed;left:0;right:0;bottom:var(--la-mrail);z-index:40;
-    border-left:none;border-top:1px solid var(--la-line);
+  /* Props bottom sheet (anchored above the toolbar). */
+  .props{position:fixed;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom, 0px));
+    z-index:40;border-left:none;border-top:1px solid var(--la-line);
     border-radius:22px 22px 0 0;box-shadow:0 -14px 44px rgba(10,10,40,.22);
     max-height:46dvh;padding:4px 16px 16px;
-    transform:translateY(calc(100% + var(--la-mrail)));visibility:hidden;
+    transform:translateY(130%);visibility:hidden;
     transition:transform .24s ease,visibility .24s;}
   :host([data-sheet]) .props{transform:none;visibility:visible}
-  :host([data-sheet][data-dragging]) .props{transform:translateY(calc(100% + var(--la-mrail)));visibility:hidden}
+  :host([data-sheet][data-dragging]) .props{transform:translateY(130%);visibility:hidden}
   .sheet-head{display:flex;align-items:center;justify-content:center;
     padding:10px 0 6px;position:sticky;top:0;background:var(--la-card);z-index:2}
   .sheet-grab{width:44px;height:5px;border-radius:99px;background:var(--la-line)}
@@ -625,8 +625,10 @@ ha-icon{--mdc-icon-size:22px}
   .props .section{margin-bottom:16px}
   .props .font-list{max-height:32dvh}
 
-  /* Popovers become bottom drawers just above the toolbar. */
-  .popover.mobile{left:8px;right:8px;top:auto;bottom:calc(var(--la-mrail) + 8px);
+  /* Popovers become bottom drawers just above the toolbar (exact offset is
+     set inline by _openPopoverAt from a measured toolbar height). */
+  .popover.mobile{left:8px;right:8px;top:auto;
+    bottom:calc(68px + env(safe-area-inset-bottom, 0px));
     max-width:none;animation:pop-up .16s ease-out}
   @keyframes pop-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   .shape-grid{grid-template-columns:repeat(auto-fill,minmax(64px,1fr))}
@@ -1128,6 +1130,16 @@ class LabelAssistantPanel extends HTMLElement {
     this._canvas.add(obj);
     this._canvas.setActiveObject(obj);
     this._canvas.requestRenderAll();
+    // New objects land at the label centre; make sure that centre is in
+    // view (a mis-fitted/scrolled stage otherwise swallows them silently).
+    if (!this._userZoom) this._fitZoom();
+    const stage = this.$("stage");
+    if (stage) {
+      stage.scrollTo({
+        left: Math.max(0, (stage.scrollWidth - stage.clientWidth) / 2),
+        top: Math.max(0, (stage.scrollHeight - stage.clientHeight) / 2),
+      });
+    }
   }
 
   _addText() {
@@ -1346,8 +1358,15 @@ class LabelAssistantPanel extends HTMLElement {
     this.shadowRoot.appendChild(pop);
     if (this._isMobile()) {
       // Phones get a bottom drawer just above the toolbar instead of a
-      // floating bubble; position comes from CSS (.popover.mobile).
+      // floating bubble. Positioned inline from a real measurement of the
+      // toolbar, so no CSS-variable resolution can ever strand it off-screen.
       pop.classList.add("mobile");
+      const rail = this.$("rail");
+      const railH = rail ? Math.ceil(rail.getBoundingClientRect().height) : 60;
+      pop.style.left = "8px";
+      pop.style.right = "8px";
+      pop.style.top = "auto";
+      pop.style.bottom = `${railH + 8}px`;
       this._popover = pop;
       return pop;
     }
