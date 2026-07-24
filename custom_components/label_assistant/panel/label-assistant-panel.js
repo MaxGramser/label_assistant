@@ -341,10 +341,10 @@ ha-icon{--mdc-icon-size:22px}
   grid-template-areas:"top top top" "rail stage props";}
 
 /* ------------------------------------------------------------------- top */
-/* 64px topbar = HA's own header height, so the divider under it continues
-   HA's chrome lines instead of breaking them. */
+/* Topbar height = HA's own --header-height, so the divider under it is the
+   exact continuation of the sidebar's header line (56px default, theme-aware). */
 .top{grid-area:top;display:flex;align-items:center;gap:4px;padding:0 12px 0 8px;
-  min-height:64px;padding-top:env(safe-area-inset-top);
+  min-height:var(--header-height,56px);padding-top:env(safe-area-inset-top);
   background:var(--la-card);border-bottom:1px solid var(--la-line);z-index:30;}
 /* The menu slot only claims the 64px rail column when the hamburger actually
    renders (ha-menu-button draws nothing while HA's sidebar is visible);
@@ -567,7 +567,6 @@ ha-icon{--mdc-icon-size:22px}
 @media (max-width: 900px){
   .app{grid-template-rows:auto 1fr auto auto;grid-template-columns:1fr;
     grid-template-areas:"top" "stage" "props" "rail";}
-  .top{min-height:56px}
   .menu-slot.has-menu{width:auto;flex:0 0 auto;margin-left:0}
   .brand>ha-icon{width:auto;flex:0 0 auto}
   .rail{flex-direction:row;justify-content:space-around;border-right:none;
@@ -1708,16 +1707,6 @@ class LabelAssistantPanel extends HTMLElement {
         </button>
       </div>
       <div class="g-section">
-        <h3 ${h3}>${esc(this.t("starters"))}</h3>
-        <div class="g-grid">
-          ${starters.map((s) => `
-            <div class="g-card" data-starter="${s.id}">
-              <div class="g-starter-emoji">${s.emoji}</div>
-              <div class="g-name">${esc(this.t(s.key))}</div>
-            </div>`).join("")}
-        </div>
-      </div>
-      <div class="g-section">
         <h3 ${h3}>${esc(this.t("myDesigns"))}</h3>
         ${designs.length ? `<div class="g-grid">
           ${designs.map((d) => `
@@ -1731,6 +1720,16 @@ class LabelAssistantPanel extends HTMLElement {
                 title="${esc(this.t("deleteDesign"))}"><ha-icon icon="mdi:trash-can-outline"></ha-icon></button>
             </div>`).join("")}
         </div>` : `<div class="tip" style="margin-top:10px">${esc(this.t("emptyDesigns"))}</div>`}
+      </div>
+      <div class="g-section">
+        <h3 ${h3}>${esc(this.t("starters"))}</h3>
+        <div class="g-grid">
+          ${starters.map((s) => `
+            <div class="g-card" data-starter="${s.id}">
+              <div class="g-starter-emoji">${s.emoji}</div>
+              <div class="g-name">${esc(this.t(s.key))}</div>
+            </div>`).join("")}
+        </div>
       </div>`;
 
     body.onclick = async (e) => {

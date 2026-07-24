@@ -3,8 +3,8 @@
 A **Canva-style label designer for Home Assistant**. Draw with shapes, text in
 playful fonts, emoji stickers, photos, QR codes and decorative frames on a
 canvas that is exactly your DYMO label — then print it with one tap on the
-generic [Label Printer add-on](https://github.com/MaxGramser/fridge_assistant)
-(the same add-on Fridge Assistant uses). Kid-proof and touch-friendly.
+[Label Printer add-on](https://github.com/MaxGramser/fridge_assistant/tree/main/addon/label_printer)
+that ships with Fridge Assistant. Kid-proof and touch-friendly.
 
 - **Canvas = the label.** Native 300 dpi geometry of a DYMO 99014
   (54 × 101 mm, 642 × 1192 px), portrait or landscape.
@@ -25,10 +25,20 @@ generic [Label Printer add-on](https://github.com/MaxGramser/fridge_assistant)
 3. Add the **Label Assistant** integration (Settings → Devices & services).
 4. A **Labels** item appears in the sidebar.
 
-Printing requires the **Label Printer** add-on from the Fridge Assistant
-repository (USB DYMO LabelWriter + CUPS). Point Label Assistant at it via the
-integration options (default: `http://local-label-printer:8000`). Designing
-works fine without a printer.
+### Printing requires the Label Printer add-on
+
+Label Assistant has no printer driver of its own — it prints through the
+**[Label Printer add-on](https://github.com/MaxGramser/fridge_assistant/tree/main/addon/label_printer)**
+from the [Fridge Assistant](https://github.com/MaxGramser/fridge_assistant)
+repository (USB DYMO LabelWriter via CUPS):
+
+1. Add `https://github.com/MaxGramser/fridge_assistant` as an add-on
+   repository (Settings → Add-ons → Add-on Store → ⋮ → Repositories).
+2. Install and start **Fridge Assistant – Label Printer**.
+3. Point Label Assistant at it via the integration options
+   (default: `http://local-label-printer:8000`).
+
+Designing works fine without a printer — only printing needs the add-on.
 
 ## Architecture
 
