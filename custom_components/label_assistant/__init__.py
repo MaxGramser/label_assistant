@@ -18,6 +18,7 @@ from .const import (
     PANEL_URL_PATH,
     PANEL_WEBCOMPONENT,
     URL_BASE,
+    VERSION,
 )
 from .store import LabelStore
 from .websocket_api import async_register_websocket
@@ -88,7 +89,8 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
         hass,
         frontend_url_path=PANEL_URL_PATH,
         webcomponent_name=PANEL_WEBCOMPONENT,
-        module_url=f"{URL_BASE}/panel.js",
+        # Versioned URL so a normal reload always picks up the newest panel.
+        module_url=f"{URL_BASE}/panel.js?v={VERSION}",
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
         require_admin=False,

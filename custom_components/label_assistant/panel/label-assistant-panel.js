@@ -341,15 +341,21 @@ ha-icon{--mdc-icon-size:22px}
   grid-template-areas:"top top top" "rail stage props";}
 
 /* ------------------------------------------------------------------- top */
-.top{grid-area:top;display:flex;align-items:center;gap:8px;padding:8px 12px 8px 0;
-  padding-top:calc(8px + env(safe-area-inset-top));
+/* 64px topbar = HA's own header height, so the divider under it continues
+   HA's chrome lines instead of breaking them. */
+.top{grid-area:top;display:flex;align-items:center;gap:4px;padding:0 12px 0 8px;
+  min-height:64px;padding-top:env(safe-area-inset-top);
   background:var(--la-card);border-bottom:1px solid var(--la-line);z-index:30;}
-/* The menu column is exactly as wide as the tool rail below it, so the
-   hamburger sits on the same vertical axis as the tool icons and the brand
-   starts flush with the stage column. */
-.menu-slot{width:64px;flex:0 0 64px;display:flex;align-items:center;justify-content:center}
+/* The menu slot only claims the 64px rail column when the hamburger actually
+   renders (ha-menu-button draws nothing while HA's sidebar is visible);
+   _applyChrome measures it and toggles .has-menu. Centered, the hamburger
+   then sits on the same x=32 axis as the tool icons below. */
+.menu-slot{width:0;flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.menu-slot.has-menu{width:64px;flex:0 0 64px;margin-left:-8px}
 .menu-slot ha-menu-button{--mdc-icon-button-size:44px;color:var(--la-text)}
-.brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;white-space:nowrap}
+/* Brand icon in a 48px box: its center lands on the rail's icon axis. */
+.brand>ha-icon{width:48px;display:inline-flex;justify-content:center;flex:0 0 48px}
+.brand{display:flex;align-items:center;gap:2px;font-weight:800;font-size:17px;white-space:nowrap}
 .brand ha-icon{color:var(--la-accent)}
 .name-wrap{flex:1;min-width:60px;display:flex;align-items:center;gap:6px}
 .name{flex:1;min-width:40px;max-width:340px;border:none;background:transparent;font-weight:700;
@@ -561,8 +567,9 @@ ha-icon{--mdc-icon-size:22px}
 @media (max-width: 900px){
   .app{grid-template-rows:auto 1fr auto auto;grid-template-columns:1fr;
     grid-template-areas:"top" "stage" "props" "rail";}
-  .top{padding-left:8px}
-  .menu-slot{width:auto;flex:0 0 auto}
+  .top{min-height:56px}
+  .menu-slot.has-menu{width:auto;flex:0 0 auto;margin-left:0}
+  .brand>ha-icon{width:auto;flex:0 0 auto}
   .rail{flex-direction:row;justify-content:space-around;border-right:none;
     border-top:1px solid var(--la-line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
   .rail .spacer{display:none}
@@ -580,7 +587,7 @@ ha-icon{--mdc-icon-size:22px}
 }
 @media (max-width: 520px){
   .swatches{grid-template-columns:repeat(6,1fr)}
-  .top{gap:4px;padding:6px 8px}
+  .top{gap:2px;padding:0 8px}
 }
 `;
 
@@ -774,6 +781,13 @@ class LabelAssistantPanel extends HTMLElement {
     }
     this._menuBtn.hass = this._hass;
     this._menuBtn.narrow = this._narrow ?? false;
+    // ha-menu-button renders nothing while HA's sidebar is visible; only
+    // reserve the 64px rail column when the hamburger is actually there.
+    requestAnimationFrame(() => {
+      if (this._menuBtn && slot.isConnected) {
+        slot.classList.toggle("has-menu", this._menuBtn.offsetWidth > 0);
+      }
+    });
   }
 
   async _loadFonts() {
