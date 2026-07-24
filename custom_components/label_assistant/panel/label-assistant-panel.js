@@ -327,7 +327,7 @@ const STYLES = `
   --la-print: linear-gradient(135deg,#ff6b81,#ff9f43);
   --la-radius: 16px;
   --la-shadow: 0 10px 30px rgba(20,20,60,.12);
-  display:block; height:100vh; height:100dvh;
+  display:block; height:100vh; height:100dvh; overflow-x:clip;
   background:var(--la-bg); color:var(--la-text);
   font-family:"Nunito", system-ui, -apple-system, sans-serif;
   overflow:hidden; user-select:none; -webkit-user-select:none;
@@ -337,7 +337,12 @@ button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:p
 input{font:inherit;color:inherit}
 ha-icon{--mdc-icon-size:22px}
 
-.app{display:grid;height:100%;grid-template-rows:auto 1fr;grid-template-columns:64px 1fr 296px;
+/* minmax(0,1fr) — a plain 1fr track can never shrink below its items'
+   min-content, so a topbar that is a hair wider than a phone screen would
+   silently widen the WHOLE grid (canvas fit against a too-wide stage,
+   toolbar scrolling inside an off-screen box). */
+.app{display:grid;height:100%;grid-template-rows:auto 1fr;
+  grid-template-columns:64px minmax(0,1fr) 296px;
   grid-template-areas:"top top top" "rail stage props";}
 
 /* ------------------------------------------------------------------- top */
@@ -576,7 +581,7 @@ ha-icon{--mdc-icon-size:22px}
    when a selection appears. Sheet/drawer anchors use literal offsets with
    env() fallbacks (a failed CSS var would strand them off-screen). */
 @media (max-width: 900px){
-  .app{grid-template-rows:auto 1fr auto;grid-template-columns:1fr;
+  .app{grid-template-rows:auto 1fr auto;grid-template-columns:minmax(0,1fr);
     grid-template-areas:"top" "stage" "rail";}
   .menu-slot.has-menu{width:auto;flex:0 0 auto;margin-left:0}
   .brand>ha-icon{width:auto;flex:0 0 auto}
@@ -641,6 +646,9 @@ ha-icon{--mdc-icon-size:22px}
   .swatches{grid-template-columns:repeat(6,1fr)}
   .top{padding-left:2px;padding-right:6px}
   .name{min-width:48px}
+}
+@media (max-width: 380px){
+  #btn-redo{display:none}
 }
 `;
 

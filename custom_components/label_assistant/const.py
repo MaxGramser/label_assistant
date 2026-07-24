@@ -7,7 +7,7 @@ from typing import Final
 DOMAIN: Final = "label_assistant"
 
 # Keep in sync with manifest.json; busts the panel.js browser cache.
-VERSION: Final = "0.1.5"
+VERSION: Final = "0.1.6"
 
 PANEL_URL_PATH: Final = "label-assistant"
 PANEL_WEBCOMPONENT: Final = "label-assistant-panel"
