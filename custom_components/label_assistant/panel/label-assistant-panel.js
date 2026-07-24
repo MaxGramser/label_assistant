@@ -341,9 +341,13 @@ ha-icon{--mdc-icon-size:22px}
   grid-template-areas:"top top top" "rail stage props";}
 
 /* ------------------------------------------------------------------- top */
-.top{grid-area:top;display:flex;align-items:center;gap:8px;padding:8px 12px;
+.top{grid-area:top;display:flex;align-items:center;gap:8px;padding:8px 12px 8px 0;
   padding-top:calc(8px + env(safe-area-inset-top));
   background:var(--la-card);border-bottom:1px solid var(--la-line);z-index:30;}
+/* The menu column is exactly as wide as the tool rail below it, so the
+   hamburger sits on the same vertical axis as the tool icons and the brand
+   starts flush with the stage column. */
+.menu-slot{width:64px;flex:0 0 64px;display:flex;align-items:center;justify-content:center}
 .menu-slot ha-menu-button{--mdc-icon-button-size:44px;color:var(--la-text)}
 .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;white-space:nowrap}
 .brand ha-icon{color:var(--la-accent)}
@@ -557,6 +561,8 @@ ha-icon{--mdc-icon-size:22px}
 @media (max-width: 900px){
   .app{grid-template-rows:auto 1fr auto auto;grid-template-columns:1fr;
     grid-template-areas:"top" "stage" "props" "rail";}
+  .top{padding-left:8px}
+  .menu-slot{width:auto;flex:0 0 auto}
   .rail{flex-direction:row;justify-content:space-around;border-right:none;
     border-top:1px solid var(--la-line);padding:6px 8px calc(6px + env(safe-area-inset-bottom));}
   .rail .spacer{display:none}
