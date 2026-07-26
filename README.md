@@ -2,12 +2,15 @@
 
 A **Canva-style label designer for Home Assistant**. Draw with shapes, text in
 playful fonts, emoji stickers, photos, QR codes and decorative frames on a
-canvas that is exactly your DYMO label — then print it with one tap on the
-[Label Printer add-on](https://github.com/MaxGramser/fridge_assistant/tree/main/addon/label_printer)
-that ships with Fridge Assistant. Kid-proof and touch-friendly.
+canvas that is exactly your label — then print it with one tap on the
+[Label Printer add-on](https://github.com/MaxGramser/label-printer-addon).
+Kid-proof and touch-friendly.
 
-- **Canvas = the label.** Native 300 dpi geometry of a DYMO 99014
-  (54 × 101 mm, 642 × 1192 px), portrait or landscape.
+- **Canvas = the label.** The canvas takes the exact native geometry of the
+  label loaded in your printer (e.g. DYMO 99014 at 54 × 101 mm / 300 dpi, or
+  a Zebra shipping label at 104 × 159 mm / 203 dpi), portrait or landscape.
+  With multiple printers you pick which one you design for; designs remember
+  their label and warn (and scale) when printed on another size.
 - **Tools:** text (12 fonts), shapes (star, heart, arrow…), 200+ emoji
   stickers, photo upload, QR codes, one-tap decorative frames.
 - **True WYSIWYG printing:** a black & white preview with Floyd–Steinberg
@@ -28,15 +31,18 @@ that ships with Fridge Assistant. Kid-proof and touch-friendly.
 ### Printing requires the Label Printer add-on
 
 Label Assistant has no printer driver of its own — it prints through the
-**[Label Printer add-on](https://github.com/MaxGramser/fridge_assistant/tree/main/addon/label_printer)**
-from the [Fridge Assistant](https://github.com/MaxGramser/fridge_assistant)
-repository (USB DYMO LabelWriter via CUPS):
+**[Label Printer add-on](https://github.com/MaxGramser/label-printer-addon)**
+(USB DYMO LabelWriter + Zebra via CUPS). Install it alongside this
+integration:
 
-1. Add `https://github.com/MaxGramser/fridge_assistant` as an add-on
+1. Add `https://github.com/MaxGramser/label-printer-addon` as an add-on
    repository (Settings → Add-ons → Add-on Store → ⋮ → Repositories).
-2. Install and start **Fridge Assistant – Label Printer**.
-3. Point Label Assistant at it via the integration options
-   (default: `http://local-label-printer:8000`).
+2. Install and start **Label Printer**, and pick which label roll is loaded
+   in its configuration (by DYMO part number or Zebra size).
+3. Point Label Assistant at it via the integration options if the default
+   URL doesn't match — an add-on installed from the repository gets a
+   hostname like `http://xxxxxxxx-label-printer:8000` (shown on the add-on's
+   page).
 
 Designing works fine without a printer — only printing needs the add-on.
 
