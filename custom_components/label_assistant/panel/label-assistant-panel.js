@@ -1,8 +1,12 @@
-/* Label Assistant panel — a Canva-style editor for DYMO 99014 labels.
+/* Label Assistant panel — a Canva-style editor for label printers.
  *
  * Fabric.js drives the canvas (vendored, /label_assistant_static/vendor).
- * Everything renders at the label's native 300 dpi geometry (642x1192 px,
- * 54x101 mm) so what you see is exactly what the printer receives.
+ * Everything renders at the target printer's native geometry (native_px from
+ * the Label Printer add-on, e.g. 642x1192 @300dpi for a DYMO 99014), so what
+ * you see is exactly what the printer receives. Designs remember which label
+ * they were made for; printing on a printer with another label loaded warns
+ * and scales. Which roll is IN a printer is add-on config (physical!), the
+ * panel only reads it.
  *
  * i18n follows the house rule: Dutch when HA's per-user language is Dutch,
  * English for everything else. UI chrome uses ha-icon/MDI; emoji only appear
@@ -11,8 +15,9 @@
 
 const BASE = "/label_assistant_static";
 
-// DYMO 99014 fallback geometry; the backend confirms it via get_state.
-const LABEL = { w: 642, h: 1192, dpi: 300 };
+// DYMO 99014 fallback geometry, used only when the add-on cannot be reached;
+// the backend confirms it via get_state.
+const LABEL = { w: 642, h: 1192, dpi: 300, media: "w154h286" };
 
 // Custom fabric props that must survive (de)serialization.
 const EXTRA_PROPS = ["laType", "laQr", "rx", "ry", "selectable", "evented"];
@@ -135,7 +140,7 @@ const STRINGS = {
     customColor: "Eigen kleur",
 
     galleryTitle: "Label Assistant",
-    gallerySub: "Ontwerp je eigen labels en print ze op de labelprinter — 54 × 101 mm.",
+    gallerySub: "Ontwerp je eigen labels en print ze op je labelprinter.",
     newLabel: "Nieuw label",
     portrait: "Staand",
     landscape: "Liggend",
@@ -154,17 +159,23 @@ const STRINGS = {
     starterGift: "Cadeautje",
 
     printTitle: "Label printen",
-    printSub: "Zo komt je label uit de printer (zwart-wit, 54 × 101 mm).",
+    printSub: (size) => `Zo komt je label uit de printer (zwart-wit${size ? `, ${size}` : ""}).`,
     copies: "Aantal",
     printBtn: "Print!",
     printing: "Printen…",
+    printerLabel: "Printer",
+    printerOffline: "offline",
+    designFor: "Ontwerpen voor",
+    printMismatch: (design, loaded) =>
+      `Dit ontwerp is gemaakt voor ${design}, maar in deze printer zit ${loaded}. Het label wordt passend geschaald.`,
+    printMismatchHint: "Ander label nodig? De rol stel je in bij de Label Printer add-on.",
     printerReady: "Printer is klaar",
     printerNotConnected: "Printer niet gevonden — staat hij aan?",
     printerUnreachable: "Printer add-on niet bereikbaar",
     printedToast: "Label wordt geprint! 🎉",
     printFailedToast: "Printen mislukt",
     reasonPrinterUnreachable: "De printer add-on is niet bereikbaar. Draait de Label Printer add-on?",
-    reasonNotConnected: "De printer is niet verbonden. Zet de DYMO aan en probeer opnieuw.",
+    reasonNotConnected: "De printer is niet verbonden. Zet hem aan en probeer opnieuw.",
 
     savedToast: "Label opgeslagen ✓",
     saveFailedToast: "Opslaan mislukt",
@@ -246,7 +257,7 @@ const STRINGS = {
     customColor: "Custom color",
 
     galleryTitle: "Label Assistant",
-    gallerySub: "Design your own labels and print them on the label printer — 54 × 101 mm.",
+    gallerySub: "Design your own labels and print them on your label printer.",
     newLabel: "New label",
     portrait: "Portrait",
     landscape: "Landscape",
@@ -265,17 +276,23 @@ const STRINGS = {
     starterGift: "Little gift",
 
     printTitle: "Print label",
-    printSub: "This is how your label will print (black & white, 54 × 101 mm).",
+    printSub: (size) => `This is how your label will print (black & white${size ? `, ${size}` : ""}).`,
     copies: "Copies",
     printBtn: "Print!",
     printing: "Printing…",
+    printerLabel: "Printer",
+    printerOffline: "offline",
+    designFor: "Design for",
+    printMismatch: (design, loaded) =>
+      `This design was made for ${design}, but this printer has ${loaded} loaded. The label will be scaled to fit.`,
+    printMismatchHint: "Need a different label? The roll is set in the Label Printer add-on.",
     printerReady: "Printer is ready",
     printerNotConnected: "Printer not found — is it switched on?",
     printerUnreachable: "Printer add-on unreachable",
     printedToast: "Your label is printing! 🎉",
     printFailedToast: "Printing failed",
     reasonPrinterUnreachable: "The printer add-on is unreachable. Is the Label Printer add-on running?",
-    reasonNotConnected: "The printer is not connected. Turn on the DYMO and try again.",
+    reasonNotConnected: "The printer is not connected. Turn it on and try again.",
 
     savedToast: "Label saved ✓",
     saveFailedToast: "Saving failed",
@@ -558,6 +575,21 @@ ha-icon{--mdc-icon-size:22px}
   align-items:center;gap:10px;background:var(--la-print);color:#fff;font-weight:800;
   box-shadow:0 8px 24px rgba(255,107,129,.4);width:100%}
 .btn-big-print[disabled]{opacity:.55;pointer-events:none}
+.pr-printer{display:flex;flex-direction:column;gap:6px}
+.pr-printer label{font-size:13px;font-weight:700;color:var(--la-muted)}
+.pr-printer select{height:44px;border-radius:12px;border:1.5px solid var(--la-line);
+  background:var(--la-card);color:var(--la-text);font:inherit;font-size:15px;padding:0 12px}
+.mismatch{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.45;
+  background:rgba(251,140,0,.13);color:#b26a00;border-radius:12px;padding:10px 12px}
+.mismatch ha-icon{--mdc-icon-size:17px;flex:none;margin-top:1px}
+.g-printers{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+.g-plabel{font-size:13px;font-weight:700;color:var(--la-muted)}
+.g-pchip{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;
+  border:1.5px solid var(--la-line);background:var(--la-card);color:var(--la-text);
+  font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.g-pchip ha-icon{--mdc-icon-size:16px}
+.g-pchip.active{border-color:var(--la-accent);background:rgba(108,92,231,.1);color:var(--la-accent)}
+.g-nsize{font-size:12px;font-weight:600;color:var(--la-muted)}
 
 /* ----------------------------------------------------------------- toast */
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);
@@ -719,6 +751,10 @@ class LabelAssistantPanel extends HTMLElement {
     this._built = false;
     this._ready = false;        // vendor libs + fonts loaded
     this._canvas = null;        // fabric.Canvas
+    this._printers = [];        // live list from the add-on (via WS "printers")
+    this._printersReachable = null;
+    this._activePrinter = "";   // user's session pick; "" = follow defaults
+    this._label = null;         // the DESIGN's geometry {w,h,dpi,media,sizeLabel}
     this._zoom = 0.5;
     this._userZoom = false;     // user overrode auto-fit
     this._orientation = "portrait";
@@ -808,6 +844,12 @@ class LabelAssistantPanel extends HTMLElement {
 
     this._initFabric();
     this._ready = true;
+    // Know the printers (and thus the label geometry) before the first blank
+    // canvas — but never let a dead add-on block the editor from opening.
+    await Promise.race([
+      this._refreshPrinters(),
+      new Promise((r) => setTimeout(r, 1500)),
+    ]).catch(() => {});
     this._newBlank("portrait", { silent: true });
     this._openGallery(true);
   }
@@ -880,10 +922,67 @@ class LabelAssistantPanel extends HTMLElement {
 
   _onState(state) {
     this._state = state;
-    if (state.label) { LABEL.w = state.label.width; LABEL.h = state.label.height; }
+    if (state.label) {
+      LABEL.w = state.label.width;
+      LABEL.h = state.label.height;
+      if (state.label.dpi) LABEL.dpi = state.label.dpi;
+      if (state.label.media) LABEL.media = state.label.media;
+    }
     // Live-refresh the gallery if it is open (e.g. someone saved elsewhere).
     const gal = this.shadowRoot.querySelector(".overlay[data-kind='gallery']");
     if (gal) this._renderGalleryContent(gal);
+  }
+
+  /* ------------------------------------------------------------ printers */
+  async _refreshPrinters() {
+    try {
+      const res = await this._ws("printers");
+      this._printersReachable = !!res.reachable;
+      this._printers = res.printers || [];
+    } catch (e) {
+      this._printersReachable = false;
+    }
+    return this._printers;
+  }
+
+  _activePrinterEntry() {
+    const list = this._printers || [];
+    const byName = (n) => (n ? list.find((p) => p.name === n) : null);
+    return byName(this._activePrinter)
+      || byName(this._state && this._state.default_printer)
+      || list.find((p) => p.default) || list[0] || null;
+  }
+
+  _mmLabel(w, h, dpi) {
+    const mm = (v) => Math.round((v / dpi) * 25.4);
+    return `${mm(w)} × ${mm(h)} mm`;
+  }
+
+  /* Design geometry from a printer entry's LOADED label (portrait px). */
+  _geoFrom(p) {
+    if (!p) return null;
+    const loaded = p.loaded || {};
+    const px = loaded.native_px || p.native_px;
+    const dpi = p.dpi || LABEL.dpi;
+    if (!px || !px[0] || !px[1]) return null;
+    return {
+      w: px[0], h: px[1], dpi,
+      media: loaded.media || p.media || "",
+      sizeLabel: loaded.label || p.label || this._mmLabel(px[0], px[1], dpi),
+    };
+  }
+
+  _fallbackGeo() {
+    return {
+      w: LABEL.w, h: LABEL.h, dpi: LABEL.dpi, media: LABEL.media,
+      sizeLabel: this._mmLabel(LABEL.w, LABEL.h, LABEL.dpi),
+    };
+  }
+
+  _updateStageBadge() {
+    const badge = this.$("stage-badge");
+    const span = badge && badge.querySelector("span");
+    if (span && this._label) span.textContent = this._label.sizeLabel;
   }
 
   /* --------------------------------------------------------------- shell */
@@ -968,9 +1067,10 @@ class LabelAssistantPanel extends HTMLElement {
   }
 
   _labelSize() {
+    const g = this._label || this._fallbackGeo();
     return this._orientation === "portrait"
-      ? { w: LABEL.w, h: LABEL.h }
-      : { w: LABEL.h, h: LABEL.w };
+      ? { w: g.w, h: g.h }
+      : { w: g.h, h: g.w };
   }
 
   _applyZoom() {
@@ -1804,6 +1904,11 @@ class LabelAssistantPanel extends HTMLElement {
       </div>`, "gallery");
     ov.dataset.start = isStart ? "1" : "";
     this._renderGalleryContent(ov);
+    // Refresh the printer list in the background (roll may have been swapped
+    // via the add-on config) and re-render the chips when it lands.
+    this._refreshPrinters().then(() => {
+      if (ov.isConnected) this._renderGalleryContent(ov);
+    }).catch(() => {});
   }
 
   _renderGalleryContent(ov) {
@@ -1824,13 +1929,31 @@ class LabelAssistantPanel extends HTMLElement {
           { day: "numeric", month: "short" });
       } catch (e) { return ""; }
     };
+    const printers = this._printers || [];
+    const active = this._activePrinterEntry();
+    const newGeo = this._geoFrom(active) || this._fallbackGeo();
+    const pchips = printers.length > 1 ? `
+      <div class="g-printers">
+        <span class="g-plabel">${esc(this.t("designFor"))}:</span>
+        ${printers.map((p) => {
+          const geo = this._geoFrom(p);
+          return `
+          <button class="g-pchip ${active && active.name === p.name ? "active" : ""}"
+            data-printer="${esc(p.name)}">
+            <ha-icon icon="mdi:printer"></ha-icon>${esc(p.name)}${geo ? ` · ${esc(geo.sizeLabel)}` : ""}${p.connected ? "" : ` (${esc(this.t("printerOffline"))})`}
+          </button>`;
+        }).join("")}
+      </div>` : "";
     body.innerHTML = `
+      ${pchips}
       <div class="g-new">
         <button class="g-new-btn" data-new="portrait">
           <span class="ph p"></span>${esc(this.t("newLabel"))} · ${esc(this.t("portrait"))}
+          <span class="g-nsize">${esc(newGeo.sizeLabel)}</span>
         </button>
         <button class="g-new-btn" data-new="landscape">
           <span class="ph l"></span>${esc(this.t("newLabel"))} · ${esc(this.t("landscape"))}
+          <span class="g-nsize">${esc(newGeo.sizeLabel)}</span>
         </button>
       </div>
       <div class="g-section">
@@ -1860,6 +1983,12 @@ class LabelAssistantPanel extends HTMLElement {
       </div>`;
 
     body.onclick = async (e) => {
+      const pc = e.target.closest("[data-printer]");
+      if (pc) {
+        this._activePrinter = pc.dataset.printer;
+        this._renderGalleryContent(ov);
+        return;
+      }
       const del = e.target.closest("[data-del]");
       if (del) {
         e.stopPropagation();
@@ -1888,6 +2017,9 @@ class LabelAssistantPanel extends HTMLElement {
     c.setBackgroundColor("#ffffff", () => {});
     this._restoring = false;
     this._orientation = orientation === "landscape" ? "landscape" : "portrait";
+    // A fresh design takes the geometry of the active printer's loaded label.
+    this._label = this._geoFrom(this._activePrinterEntry()) || this._fallbackGeo();
+    this._updateStageBadge();
     this._userZoom = false;
     this._designId = null;
     this._designName = "";
@@ -1905,6 +2037,17 @@ class LabelAssistantPanel extends HTMLElement {
       const design = await this._ws("load_design", { design_id: designId });
       this._restoring = true;
       this._orientation = design.orientation === "landscape" ? "landscape" : "portrait";
+      // Designs keep the geometry they were made for; pre-0.2.0 designs
+      // (no stored size) are all classic DYMO 99014 = the fallback.
+      this._label = (design.width && design.height)
+        ? {
+            w: design.width, h: design.height, dpi: design.dpi || LABEL.dpi,
+            media: design.media || "",
+            sizeLabel: this._mmLabel(design.width, design.height,
+                                     design.dpi || LABEL.dpi),
+          }
+        : this._fallbackGeo();
+      this._updateStageBadge();
       this._userZoom = false;
       const json = typeof design.json === "string" ? JSON.parse(design.json) : design.json;
       await new Promise((res) => this._canvas.loadFromJSON(json, res));
@@ -1945,10 +2088,15 @@ class LabelAssistantPanel extends HTMLElement {
     const name = (this._designName || "").trim() || this._defaultName();
     this._canvas.discardActiveObject();
     this._canvas.renderAll();
+    const geo = this._label || this._fallbackGeo();
     const payload = {
       name,
       orientation: this._orientation,
       json: JSON.stringify(this._canvas.toJSON(EXTRA_PROPS)),
+      media: geo.media || "",
+      width: geo.w,
+      height: geo.h,
+      dpi: geo.dpi,
     };
     const thumb = this._thumbnail();
     if (thumb) payload.thumbnail = thumb;
@@ -2106,11 +2254,12 @@ class LabelAssistantPanel extends HTMLElement {
       return;
     }
     const land = this._orientation === "landscape";
+    const design = this._label || this._fallbackGeo();
     const ov = this._modal(`
       <div class="modal">
         <div class="modal-head">
           <h2><ha-icon icon="mdi:printer"></ha-icon>${esc(this.t("printTitle"))}</h2>
-          <p class="sub">${esc(this.t("printSub"))}</p>
+          <p class="sub">${esc(this.t("printSub", design.sizeLabel))}</p>
           <button class="icon-btn x" data-close><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
         <div class="print-flex">
@@ -2121,6 +2270,13 @@ class LabelAssistantPanel extends HTMLElement {
             <span class="chip wait" id="pr-chip">
               <ha-icon icon="mdi:timer-sand"></ha-icon><span>…</span>
             </span>
+            <div class="pr-printer" id="pr-printer-row" hidden>
+              <label>${esc(this.t("printerLabel"))}</label>
+              <select id="pr-sel"></select>
+            </div>
+            <div class="mismatch" id="pr-mismatch" hidden>
+              <ha-icon icon="mdi:alert-outline"></ha-icon><span id="pr-mismatch-txt"></span>
+            </div>
             <div>
               <label style="font-size:13px;font-weight:700;color:var(--la-muted)">${esc(this.t("copies"))}</label>
               <div class="copies-row">
@@ -2146,26 +2302,80 @@ class LabelAssistantPanel extends HTMLElement {
     });
 
     const chip = ov.querySelector("#pr-chip");
-    this._ws("printer_status").then((st) => {
-      if (!chip.isConnected) return;
-      if (st.reachable && st.connected) {
-        chip.className = "chip ok";
-        chip.innerHTML = `<ha-icon icon="mdi:check-circle"></ha-icon><span>${esc(this.t("printerReady"))}</span>`;
-      } else if (st.reachable) {
-        chip.className = "chip bad";
-        chip.innerHTML = `<ha-icon icon="mdi:printer-off"></ha-icon><span>${esc(this.t("printerNotConnected"))}</span>`;
-      } else {
-        chip.className = "chip bad";
-        chip.innerHTML = `<ha-icon icon="mdi:lan-disconnect"></ha-icon><span>${esc(this.t("printerUnreachable"))}</span>`;
+    const prRow = ov.querySelector("#pr-printer-row");
+    const prSel = ov.querySelector("#pr-sel");
+    const mismatch = ov.querySelector("#pr-mismatch");
+    const mismatchTxt = ov.querySelector("#pr-mismatch-txt");
+    let selectedPrinter = "";  // "" = the add-on's own default queue
+
+    const setChip = (cls, icon, textKey) => {
+      chip.className = `chip ${cls}`;
+      chip.innerHTML = `<ha-icon icon="${icon}"></ha-icon><span>${esc(this.t(textKey))}</span>`;
+    };
+
+    const applyPrinterUi = () => {
+      if (!ov.isConnected) return;
+      const list = this._printers || [];
+      if (!list.length) {
+        prRow.hidden = true;
+        mismatch.hidden = true;
+        if (this._printersReachable === false) {
+          setChip("bad", "mdi:lan-disconnect", "printerUnreachable");
+        }
+        return;
       }
-    }).catch(() => {});
+      // Preselect: a connected printer that has the design's label loaded
+      // wins; otherwise the active/default printer.
+      if (!selectedPrinter) {
+        const match = design.media && list.find((p) => {
+          const geo = this._geoFrom(p);
+          return p.connected && geo && geo.media === design.media;
+        });
+        const pick = match || this._activePrinterEntry() || list[0];
+        selectedPrinter = pick ? pick.name : "";
+      }
+      const cur = list.find((p) => p.name === selectedPrinter) || list[0];
+      selectedPrinter = cur.name;
+      if (list.length > 1) {
+        prRow.hidden = false;
+        prSel.innerHTML = list.map((p) => {
+          const geo = this._geoFrom(p);
+          return `<option value="${esc(p.name)}"${p.name === selectedPrinter ? " selected" : ""}>` +
+            `${esc(p.name)}${geo ? ` — ${esc(geo.sizeLabel)}` : ""}` +
+            `${p.connected ? "" : ` (${esc(this.t("printerOffline"))})`}</option>`;
+        }).join("");
+      } else {
+        prRow.hidden = true;
+      }
+      if (cur.connected) setChip("ok", "mdi:check-circle", "printerReady");
+      else setChip("bad", "mdi:printer-off", "printerNotConnected");
+      const geo = this._geoFrom(cur);
+      const wrongLabel = !!(geo && design.media && geo.media &&
+                            geo.media !== design.media);
+      mismatch.hidden = !wrongLabel;
+      if (wrongLabel) {
+        mismatchTxt.textContent =
+          `${this.t("printMismatch", design.sizeLabel, geo.sizeLabel)} ` +
+          this.t("printMismatchHint");
+      }
+    };
+
+    prSel.addEventListener("change", () => {
+      selectedPrinter = prSel.value;
+      applyPrinterUi();
+    });
+
+    if (this._printers && this._printers.length) applyPrinterUi();
+    this._refreshPrinters().then(applyPrinterUi).catch(() => {});
 
     const go = ov.querySelector("#pr-go");
     go.addEventListener("click", async () => {
       go.disabled = true;
       go.innerHTML = `<ha-icon icon="mdi:timer-sand"></ha-icon>${esc(this.t("printing"))}`;
       try {
-        const res = await this._ws("print", { png_base64: rendered.b64, copies });
+        const payload = { png_base64: rendered.b64, copies };
+        if (selectedPrinter) payload.printer = selectedPrinter;
+        const res = await this._ws("print", payload);
         if (res.printed) {
           ov.remove();
           this._confetti();

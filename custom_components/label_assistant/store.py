@@ -15,7 +15,10 @@ from .const import DOMAIN, STORAGE_KEY, STORAGE_VERSION
 _LOGGER = logging.getLogger(__name__)
 
 # Fields a client may set on a design; everything else is server-managed.
-_CLIENT_FIELDS = ("name", "orientation", "json", "thumbnail")
+# media/width/height/dpi record which label the design was made for, so the
+# panel can warn (and scale) when printing on a printer with another label.
+_CLIENT_FIELDS = ("name", "orientation", "json", "thumbnail",
+                  "media", "width", "height", "dpi")
 
 
 class LabelStore:

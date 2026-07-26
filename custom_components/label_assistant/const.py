@@ -7,7 +7,7 @@ from typing import Final
 DOMAIN: Final = "label_assistant"
 
 # Keep in sync with manifest.json; busts the panel.js browser cache.
-VERSION: Final = "0.1.6"
+VERSION: Final = "0.2.0"
 
 PANEL_URL_PATH: Final = "label-assistant"
 PANEL_WEBCOMPONENT: Final = "label-assistant-panel"
@@ -16,11 +16,13 @@ PANEL_TITLE: Final = "Labels"
 URL_BASE: Final = "/label_assistant_static"
 
 CONF_PRINTER_URL: Final = "printer_url"
+CONF_DEFAULT_PRINTER: Final = "default_printer"
 DEFAULT_PRINTER_URL: Final = "http://local-label-printer:8000"
 
-# DYMO 99014 (54 x 101 mm) on a LabelWriter 550/400 at 300 dpi, portrait.
-# Same geometry as Fridge Assistant; the generic Label Printer add-on prints
-# any PNG we send it.
+# DYMO 99014 (54 x 101 mm) at 300 dpi, portrait. Only a FALLBACK canvas for
+# when the add-on cannot be reached (or is too old to report printers); the
+# real geometry comes from GET /printers per printer (loaded/supported media
+# with native_px) so nothing is hard-coded to one label.
 LABEL_DPI: Final = 300
 LABEL_W: Final = 642
 LABEL_H: Final = 1192

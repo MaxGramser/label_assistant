@@ -19,6 +19,7 @@ from homeassistant.helpers.dispatcher import (
 )
 
 from .const import (
+    CONF_DEFAULT_PRINTER,
     CONF_PRINTER_URL,
     DEFAULT_PRINTER_URL,
     DOMAIN,
@@ -45,6 +46,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_delete_design)
     websocket_api.async_register_command(hass, ws_print)
     websocket_api.async_register_command(hass, ws_printer_status)
+    websocket_api.async_register_command(hass, ws_printers)
 
 
 def _runtime(hass: HomeAssistant):
@@ -64,6 +66,8 @@ def _design_meta(design: dict[str, Any]) -> dict[str, Any]:
 def _serialize_state(runtime) -> dict[str, Any]:
     return {
         "designs": [_design_meta(d) for d in runtime.store.sorted_designs()],
+        # Fallback canvas for when the add-on is unreachable; the panel asks
+        # the live geometry via the "printers" command.
         "label": {
             "width": LABEL_W,
             "height": LABEL_H,
@@ -71,7 +75,32 @@ def _serialize_state(runtime) -> dict[str, Any]:
             "media": LABEL_MEDIA,
             "name": LABEL_NAME,
         },
+        "default_printer": runtime.entry.options.get(CONF_DEFAULT_PRINTER) or "",
         "printer_url": _printer_url(runtime),
+    }
+
+
+def _fallback_printer_entry(health: dict[str, Any]) -> dict[str, Any]:
+    """One printer synthesized from /health for add-ons predating /printers."""
+    media = health.get("default_media") or LABEL_MEDIA
+    entry = {
+        "media": media,
+        "label": LABEL_NAME if media == LABEL_MEDIA else media,
+        "native_px": [LABEL_W, LABEL_H] if media == LABEL_MEDIA else None,
+    }
+    return {
+        "name": health.get("printer") or "dymo",
+        "kind": "dymo",
+        "model": health.get("model") or "",
+        "connected": bool(health.get("connected")),
+        "media": media,
+        "dpi": LABEL_DPI,
+        "native_px": entry["native_px"],
+        "loaded": entry,
+        "supported": [entry],
+        "custom_media": False,
+        "accepts": ["png", "pdf", "jpg"],
+        "default": True,
     }
 
 
@@ -128,6 +157,11 @@ async def ws_load_design(hass, connection, msg) -> None:
         vol.Required("orientation"): vol.In(["portrait", "landscape"]),
         vol.Required("json"): vol.All(str, vol.Length(max=MAX_DESIGN_JSON)),
         vol.Optional("thumbnail"): vol.All(str, vol.Length(max=MAX_THUMBNAIL)),
+        # Which label the design targets (portrait px + CUPS media name).
+        vol.Optional("media"): str,
+        vol.Optional("width"): vol.All(vol.Coerce(int), vol.Range(min=1)),
+        vol.Optional("height"): vol.All(vol.Coerce(int), vol.Range(min=1)),
+        vol.Optional("dpi"): vol.All(vol.Coerce(int), vol.Range(min=1)),
     }
 )
 @websocket_api.async_response
@@ -136,7 +170,8 @@ async def ws_save_design(hass, connection, msg) -> None:
     user = connection.user
     design = await runtime.store.upsert(
         {k: msg[k] for k in ("design_id", "name", "orientation", "json",
-                             "thumbnail") if k in msg},
+                             "thumbnail", "media", "width", "height", "dpi")
+         if k in msg},
         user_name=(user.name if user else None),
     )
     _notify_changed(hass)
@@ -164,11 +199,17 @@ async def ws_delete_design(hass, connection, msg) -> None:
         vol.Optional("copies", default=1): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=MAX_COPIES)
         ),
+        vol.Optional("printer"): str,
     }
 )
 @websocket_api.async_response
 async def ws_print(hass, connection, msg) -> None:
-    """Forward a finished PNG to the generic Label Printer add-on."""
+    """Forward a finished PNG to the generic Label Printer add-on.
+
+    No media is sent: the PNG is rendered at the target printer's native_px,
+    and the queue's own loaded-label setting does the rest (add-on contract:
+    clients never hard-code sizes).
+    """
     runtime = _runtime(hass)
     url = _printer_url(runtime)
     try:
@@ -181,8 +222,10 @@ async def ws_print(hass, connection, msg) -> None:
 
     form = aiohttp.FormData()
     form.add_field("file", png, filename="label.png", content_type="image/png")
-    form.add_field("media", LABEL_MEDIA)
     form.add_field("copies", str(msg["copies"]))
+    printer = msg.get("printer") or ""
+    if printer:
+        form.add_field("printer", printer)
 
     session = async_get_clientsession(hass)
     try:
@@ -197,6 +240,7 @@ async def ws_print(hass, connection, msg) -> None:
                 "reason": None if ok else (body.get("error") or f"http_{resp.status}"),
                 "detail": body.get("detail") or body.get("hint"),
                 "copies": msg["copies"],
+                "printer": body.get("printer") or printer or None,
             })
     except aiohttp.ClientError as err:
         connection.send_result(msg["id"], {
@@ -230,4 +274,45 @@ async def ws_printer_status(hass, connection, msg) -> None:
     except Exception:  # noqa: BLE001 - status is best-effort
         connection.send_result(msg["id"], {
             "reachable": False, "connected": False,
+        })
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/printers"})
+@websocket_api.async_response
+async def ws_printers(hass, connection, msg) -> None:
+    """The add-on's printer list: per printer its loaded label, supported
+    media (with native_px render sizes) and connection state."""
+    runtime = _runtime(hass)
+    url = _printer_url(runtime)
+    session = async_get_clientsession(hass)
+    default_printer = runtime.entry.options.get(CONF_DEFAULT_PRINTER) or ""
+    try:
+        async with session.get(
+            f"{url}/printers", timeout=aiohttp.ClientTimeout(total=5)
+        ) as resp:
+            if resp.status == 404:  # add-on predates /printers: use /health
+                async with session.get(
+                    f"{url}/health", timeout=aiohttp.ClientTimeout(total=5)
+                ) as health_resp:
+                    health = await health_resp.json(content_type=None)
+                connection.send_result(msg["id"], {
+                    "reachable": True,
+                    "api_version": 0,
+                    "default": health.get("printer") or "dymo",
+                    "default_printer": default_printer,
+                    "printers": [_fallback_printer_entry(health)],
+                })
+                return
+            body = await resp.json(content_type=None)
+            connection.send_result(msg["id"], {
+                "reachable": True,
+                "api_version": body.get("api_version", 0),
+                "default": body.get("default"),
+                "default_printer": default_printer,
+                "printers": body.get("printers") or [],
+            })
+    except Exception:  # noqa: BLE001 - the panel falls back to its own canvas
+        connection.send_result(msg["id"], {
+            "reachable": False, "api_version": 0,
+            "default_printer": default_printer, "printers": [],
         })

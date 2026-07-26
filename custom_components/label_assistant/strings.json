@@ -15,10 +15,12 @@
       "init": {
         "title": "Label Assistant settings",
         "data": {
-          "printer_url": "Printer add-on URL"
+          "printer_url": "Printer add-on URL",
+          "default_printer": "Default printer"
         },
         "data_description": {
-          "printer_url": "HTTP address of the generic Label Printer add-on, e.g. http://local-label-printer:8000"
+          "printer_url": "HTTP address of the generic Label Printer add-on, e.g. http://local-label-printer:8000",
+          "default_printer": "Queue name from the add-on (e.g. dymo or zebra). Leave empty to use the add-on's own default."
         }
       }
     }
