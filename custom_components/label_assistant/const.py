@@ -7,7 +7,7 @@ from typing import Final
 DOMAIN: Final = "label_assistant"
 
 # Keep in sync with manifest.json; busts the panel.js browser cache.
-VERSION: Final = "0.2.0"
+VERSION: Final = "0.3.0"
 
 PANEL_URL_PATH: Final = "label-assistant"
 PANEL_WEBCOMPONENT: Final = "label-assistant-panel"
@@ -23,9 +23,11 @@ DEFAULT_PRINTER_URL: Final = "http://local-label-printer:8000"
 # when the add-on cannot be reached (or is too old to report printers); the
 # real geometry comes from GET /printers per printer (loaded/supported media
 # with native_px) so nothing is hard-coded to one label.
+# 638x1191 = the PPD's PaperDimension (153.12 x 285.84 pt) at 300 dpi — the
+# raster CUPS really produces; the w154h286 media NAME rounds up and lies.
 LABEL_DPI: Final = 300
-LABEL_W: Final = 642
-LABEL_H: Final = 1192
+LABEL_W: Final = 638
+LABEL_H: Final = 1191
 LABEL_MEDIA: Final = "w154h286"
 LABEL_NAME: Final = "99014"
 

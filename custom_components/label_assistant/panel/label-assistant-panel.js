@@ -16,8 +16,9 @@
 const BASE = "/label_assistant_static";
 
 // DYMO 99014 fallback geometry, used only when the add-on cannot be reached;
-// the backend confirms it via get_state.
-const LABEL = { w: 642, h: 1192, dpi: 300, media: "w154h286" };
+// the backend confirms it via get_state. 638x1191 = the PPD PaperDimension
+// (153.12 x 285.84 pt) at 300 dpi — the raster CUPS really produces.
+const LABEL = { w: 638, h: 1191, dpi: 300, media: "w154h286" };
 
 // Custom fabric props that must survive (de)serialization.
 const EXTRA_PROPS = ["laType", "laQr", "rx", "ry", "selectable", "evented"];
@@ -438,6 +439,15 @@ ha-icon{--mdc-icon-size:22px}
   overflow:hidden;display:none;background:#fff}
 .bw-overlay img{width:100%;height:100%;display:block;image-rendering:auto}
 .bw-overlay.on{display:block}
+/* Printable-area overlay: the head cannot reach the hatched strips (data
+   from the Label Printer add-on per label), so art there stays white. Pure
+   chrome above the canvas AND the B&W preview; never part of the export. */
+.pa-overlay{position:absolute;inset:0;z-index:7;pointer-events:none;border-radius:14px;
+  overflow:hidden;display:none}
+.pa-overlay.on{display:block}
+.pa-strip{position:absolute;background:repeating-linear-gradient(45deg,
+  rgba(244,67,54,.18) 0 5px, rgba(244,67,54,.04) 5px 11px)}
+.pa-rect{position:absolute;border:2px dashed rgba(244,67,54,.45);border-radius:3px}
 .zoom-fabs{position:absolute;right:14px;bottom:14px;display:flex;flex-direction:column;gap:6px;z-index:10}
 .zoom-fabs .icon-btn{background:var(--la-card);box-shadow:var(--la-shadow)}
 .stage-badge{position:absolute;left:14px;bottom:14px;z-index:10;background:var(--la-card);
@@ -581,6 +591,9 @@ ha-icon{--mdc-icon-size:22px}
   background:var(--la-card);color:var(--la-text);font:inherit;font-size:15px;padding:0 12px}
 .mismatch{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.45;
   background:rgba(251,140,0,.13);color:#b26a00;border-radius:12px;padding:10px 12px}
+/* Author display rules beat the UA's [hidden]{display:none}, so restore it
+   explicitly — without this, hidden flex containers stay visible. */
+[hidden]{display:none!important}
 .mismatch ha-icon{--mdc-icon-size:17px;flex:none;margin-top:1px}
 .g-printers{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 16px}
 .g-plabel{font-size:13px;font-weight:700;color:var(--la-muted)}
@@ -727,6 +740,13 @@ const SHELL = `
         <div class="guide v" id="guide-v"></div>
         <div class="guide h" id="guide-h"></div>
         <div class="bw-overlay" id="bw-overlay"><img id="bw-img" alt=""></div>
+        <div class="pa-overlay" id="pa-overlay">
+          <div class="pa-strip" data-s="t"></div>
+          <div class="pa-strip" data-s="b"></div>
+          <div class="pa-strip" data-s="l"></div>
+          <div class="pa-strip" data-s="r"></div>
+          <div class="pa-rect" id="pa-rect"></div>
+        </div>
       </div>
     </div>
     <div class="stage-badge" id="stage-badge"><ha-icon icon="mdi:sticker-outline"></ha-icon><span>54 × 101 mm</span></div>
@@ -939,6 +959,12 @@ class LabelAssistantPanel extends HTMLElement {
       const res = await this._ws("printers");
       this._printersReachable = !!res.reachable;
       this._printers = res.printers || [];
+      // A design loaded before the printer list arrived has no printable
+      // rect yet; the list may know its media now.
+      if (this._label && !this._label.printable) {
+        this._label.printable = this._printableRect(this._label.media);
+        this._updatePrintableOverlay();
+      }
     } catch (e) {
       this._printersReachable = false;
     }
@@ -969,6 +995,7 @@ class LabelAssistantPanel extends HTMLElement {
       w: px[0], h: px[1], dpi,
       media: loaded.media || p.media || "",
       sizeLabel: loaded.label || p.label || this._mmLabel(px[0], px[1], dpi),
+      printable: (loaded.printable && loaded.printable.rect_px) || null,
     };
   }
 
@@ -976,13 +1003,61 @@ class LabelAssistantPanel extends HTMLElement {
     return {
       w: LABEL.w, h: LABEL.h, dpi: LABEL.dpi, media: LABEL.media,
       sizeLabel: this._mmLabel(LABEL.w, LABEL.h, LABEL.dpi),
+      // DYMO 99014 ImageableArea (5.4 mm leading / 1.5 left / 1.0 right /
+      // 1.5 trailing) precomputed at 300 dpi, for when the add-on is away.
+      printable: { x: 18, y: 64, w: 608, h: 1109 },
     };
+  }
+
+  /* Printable rect for a media name, from any printer that knows it. */
+  _printableRect(media) {
+    if (!media) return null;
+    for (const p of this._printers || []) {
+      const hit = [p.loaded, ...(p.supported || [])].find(
+        (m) => m && m.media === media && m.printable && m.printable.rect_px
+      );
+      if (hit) return hit.printable.rect_px;
+    }
+    return media === LABEL.media ? this._fallbackGeo().printable : null;
   }
 
   _updateStageBadge() {
     const badge = this.$("stage-badge");
     const span = badge && badge.querySelector("span");
     if (span && this._label) span.textContent = this._label.sizeLabel;
+    this._updatePrintableOverlay();
+  }
+
+  /* Hatch the strips of the sticker the print head cannot reach. The design
+     canvas stays the full physical sticker; this is display-only chrome
+     (percent-based, so zoom needs no recompute). In landscape view the
+     portrait canvas is rotated +90° at print time (leading edge = left). */
+  _updatePrintableOverlay() {
+    const ov = this.$("pa-overlay");
+    if (!ov || !this._label) return;
+    const g = this._label;
+    const r = g.printable;
+    const none = !r || (r.x <= 0 && r.y <= 0 &&
+                        r.w >= g.w && r.h >= g.h);
+    ov.classList.toggle("on", !none);
+    if (none) return;
+    // Portrait margins in px, then mapped into the current view.
+    const m = { top: r.y, left: r.x, right: g.w - r.x - r.w,
+                bottom: g.h - r.y - r.h };
+    const land = this._orientation === "landscape";
+    const view = land
+      ? { w: g.h, h: g.w, t: m.right, b: m.left, l: m.top, r: m.bottom }
+      : { w: g.w, h: g.h, t: m.top, b: m.bottom, l: m.left, r: m.right };
+    const pct = (v, total) => `${(100 * v / total).toFixed(3)}%`;
+    const t = pct(view.t, view.h), b = pct(view.b, view.h);
+    const l = pct(view.l, view.w), rr = pct(view.r, view.w);
+    const strip = (s) => ov.querySelector(`[data-s="${s}"]`);
+    Object.assign(strip("t").style, { left: 0, right: 0, top: 0, height: t });
+    Object.assign(strip("b").style, { left: 0, right: 0, bottom: 0, height: b });
+    Object.assign(strip("l").style, { left: 0, width: l, top: t, bottom: b });
+    Object.assign(strip("r").style, { right: 0, width: rr, top: t, bottom: b });
+    Object.assign(this.$("pa-rect").style,
+                  { left: l, right: rr, top: t, bottom: b });
   }
 
   /* --------------------------------------------------------------- shell */
@@ -1078,6 +1153,7 @@ class LabelAssistantPanel extends HTMLElement {
     this._canvas.setZoom(this._zoom);
     this._canvas.setDimensions({ width: w * this._zoom, height: h * this._zoom });
     this._canvas.requestRenderAll();
+    this._updatePrintableOverlay();
   }
 
   /* On phones the props panel is a bottom sheet over the stage; it opens on
@@ -2045,6 +2121,7 @@ class LabelAssistantPanel extends HTMLElement {
             media: design.media || "",
             sizeLabel: this._mmLabel(design.width, design.height,
                                      design.dpi || LABEL.dpi),
+            printable: this._printableRect(design.media),
           }
         : this._fallbackGeo();
       this._updateStageBadge();
@@ -2350,8 +2427,13 @@ class LabelAssistantPanel extends HTMLElement {
       if (cur.connected) setChip("ok", "mdi:check-circle", "printerReady");
       else setChip("bad", "mdi:printer-off", "printerNotConnected");
       const geo = this._geoFrom(cur);
-      const wrongLabel = !!(geo && design.media && geo.media &&
-                            geo.media !== design.media);
+      // Compare by media name when both sides know it; older designs saved
+      // no media, so fall back to the pixel canvas — different px means the
+      // print will be scaled, which is exactly what the warning is about.
+      const wrongLabel = !!(geo && (design.media && geo.media
+        ? geo.media !== design.media
+        : design.w && design.h && geo.w && geo.h &&
+          (geo.w !== design.w || geo.h !== design.h)));
       mismatch.hidden = !wrongLabel;
       if (wrongLabel) {
         mismatchTxt.textContent =
