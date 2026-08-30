@@ -24,5 +24,20 @@
         }
       }
     }
+  },
+  "entity": {
+    "sensor": {
+      "loaded_label": {
+        "name": "Loaded label"
+      },
+      "roll_left": {
+        "name": "Labels left"
+      }
+    },
+    "binary_sensor": {
+      "attention": {
+        "name": "Needs attention"
+      }
+    }
   }
 }

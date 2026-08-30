@@ -9,6 +9,7 @@ from pathlib import Path
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .const import (
@@ -20,12 +21,17 @@ from .const import (
     URL_BASE,
     VERSION,
 )
+from .coordinator import PrinterCoordinator
 from .store import LabelStore
 from .websocket_api import async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
 
 _STATIC_REGISTERED = "static_registered"
+
+# The printer's own state as entities, so an empty roll or a jam can trigger
+# an automation instead of only being visible to whoever opens the add-on.
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
 
 
 @dataclass
@@ -44,9 +50,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await store.async_load()
     domain_data["runtime"] = LabelRuntime(entry=entry, store=store)
 
+    coordinator = PrinterCoordinator(hass, entry)
+    # async_refresh, not async_config_entry_first_refresh: the latter aborts
+    # setup when the add-on is unreachable, and the label editor has to open
+    # with the printer switched off. A failed poll just leaves the entities
+    # unavailable until the next tick.
+    await coordinator.async_refresh()
+    domain_data["coordinator"] = coordinator
+
     await _async_register_static(hass)
     await _async_register_panel(hass)
     async_register_websocket(hass)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True
@@ -54,10 +69,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     hass.data[DOMAIN].pop("runtime", None)
+    hass.data[DOMAIN].pop("coordinator", None)
     if PANEL_URL_PATH in hass.data.get(frontend.DATA_PANELS, {}):
         frontend.async_remove_panel(hass, PANEL_URL_PATH)
-    return True
+    return unloaded
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

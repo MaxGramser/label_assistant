@@ -16,9 +16,10 @@
 const BASE = "/label_assistant_static";
 
 // DYMO 99014 fallback geometry, used only when the add-on cannot be reached;
-// the backend confirms it via get_state. 638x1191 = the PPD PaperDimension
-// (153.12 x 285.84 pt) at 300 dpi — the raster CUPS really produces.
-const LABEL = { w: 638, h: 1191, dpi: 300, media: "w154h286" };
+// the backend confirms it via get_state. 639x1191 is the raster CUPS really
+// produces, as measured by the add-on — not the PaperDimension arithmetic,
+// which lands a dot short.
+const LABEL = { w: 639, h: 1191, dpi: 300, media: "w154h286" };
 
 // Custom fabric props that must survive (de)serialization.
 const EXTRA_PROPS = ["laType", "laQr", "rx", "ry", "selectable", "evented"];
@@ -2139,7 +2140,8 @@ class LabelAssistantPanel extends HTMLElement {
       if (this._bwOn) this._updateBwDebounced();
     } catch (err) {
       this._restoring = false;
-      this._toast(this.t("loadFailedToast"), false);
+      console.error("[label-assistant] load_design failed", err);
+      this._toast(`${this.t("loadFailedToast")}${err && err.message ? ": " + err.message : ""}`, false);
     }
   }
 
@@ -2427,13 +2429,16 @@ class LabelAssistantPanel extends HTMLElement {
       if (cur.connected) setChip("ok", "mdi:check-circle", "printerReady");
       else setChip("bad", "mdi:printer-off", "printerNotConnected");
       const geo = this._geoFrom(cur);
-      // Compare by media name when both sides know it; older designs saved
-      // no media, so fall back to the pixel canvas — different px means the
-      // print will be scaled, which is exactly what the warning is about.
-      const wrongLabel = !!(geo && (design.media && geo.media
-        ? geo.media !== design.media
-        : design.w && design.h && geo.w && geo.h &&
-          (geo.w !== design.w || geo.h !== design.h)));
+      // A different media name means a different label. The same name is not
+      // proof of a match though, so the pixels are checked as well rather
+      // than instead: a design saved against an earlier reported canvas can
+      // be a dot off under the very same media name, and that still gets
+      // scaled on its way to the printer — which is what the warning is for.
+      // (Checking the name alone hid exactly that case.)
+      const sized = design.w && design.h && geo && geo.w && geo.h;
+      const wrongLabel = !!(geo && (
+        (design.media && geo.media && geo.media !== design.media) ||
+        (sized && (geo.w !== design.w || geo.h !== design.h))));
       mismatch.hidden = !wrongLabel;
       if (wrongLabel) {
         mismatchTxt.textContent =
