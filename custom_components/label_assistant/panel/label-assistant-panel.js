@@ -30,6 +30,16 @@ const HISTORY_MAX = 60;
 // Vendored woff2 fonts (Google Fonts, OFL). Weight is fixed per entry so the
 // canvas never needs synthesized bold (unreliable in canvas2d).
 const FONTS = [
+  // THNDR huisstijl (brandbook: thndr.studio/brandbook) — vendored from the
+  // studio's own font downloads, same woff2-only convention as the rest.
+  { id: "futura-book", label: "Futura (THNDR)", labelEn: "Futura (THNDR)", family: "Futura LT", weight: 400, file: "futura-book-400.woff2" },
+  { id: "futura-bold", label: "Futura bold (THNDR)", labelEn: "Futura bold (THNDR)", family: "Futura LT", weight: 700, file: "futura-bold-700.woff2" },
+  { id: "futura-extrabold", label: "Futura extra bold (THNDR)", labelEn: "Futura extra bold (THNDR)", family: "Futura LT", weight: 800, file: "futura-extrabold-800.woff2" },
+  { id: "futura-heavy", label: "Futura heavy (THNDR)", labelEn: "Futura heavy (THNDR)", family: "Futura LT", weight: 900, file: "futura-heavy-900.woff2" },
+  { id: "plexmono", label: "IBM Plex Mono (THNDR)", labelEn: "IBM Plex Mono (THNDR)", family: "IBM Plex Mono", weight: 400, file: "ibmplexmono-400.woff2" },
+  { id: "plexmono-bold", label: "IBM Plex Mono bold (THNDR)", labelEn: "IBM Plex Mono bold (THNDR)", family: "IBM Plex Mono", weight: 700, file: "ibmplexmono-700.woff2" },
+  { id: "plexsans", label: "IBM Plex Sans (THNDR)", labelEn: "IBM Plex Sans (THNDR)", family: "IBM Plex Sans", weight: 400, file: "ibmplexsans-400.woff2" },
+  { id: "plexsans-bold", label: "IBM Plex Sans bold (THNDR)", labelEn: "IBM Plex Sans bold (THNDR)", family: "IBM Plex Sans", weight: 700, file: "ibmplexsans-700.woff2" },
   { id: "nunito-800", label: "Nunito", family: "Nunito", weight: 800, file: "nunito-800.woff2" },
   { id: "nunito-400", label: "Nunito dun", labelEn: "Nunito light", family: "Nunito", weight: 400, file: "nunito-400.woff2" },
   { id: "fredoka", label: "Fredoka", family: "Fredoka", weight: 600, file: "fredoka-600.woff2" },
@@ -51,6 +61,9 @@ const FONT_FACES = FONTS.filter((f) => f.file)
 
 /* ----------------------------------------------------------------- colors */
 const PALETTE = [
+  // THNDR brandbook (thndr.studio/brandbook), first so the house colors are
+  // the easy pick; #000000/#ffffff already cover black/white below.
+  "#ff7a00", "#1c1c1c", "#f5f5f5",
   "#000000", "#5f6368", "#9aa0a6", "#ffffff",
   "#e53935", "#fb8c00", "#fdd835", "#43a047",
   "#00acc1", "#1e88e5", "#8e24aa", "#d81b60",
@@ -92,6 +105,7 @@ const STRINGS = {
     toolImage: "Foto",
     toolQr: "QR-code",
     toolFrames: "Kaders",
+    toolLogo: "THNDR-logo",
     clearAll: "Alles wissen",
     confirmClear: "Alles van het label wissen?",
 
@@ -185,6 +199,8 @@ const STRINGS = {
     loadFailedToast: "Laden mislukt",
     imageTooBig: "Afbeelding is te groot (max 8 MB).",
     unsaved: "Niet-opgeslagen wijzigingen",
+    saving: "Bezig met opslaan…",
+    leaveUnsaved: "Je hebt niet-opgeslagen wijzigingen.",
   },
   en: {
     appTitle: "Label Assistant",
@@ -209,6 +225,7 @@ const STRINGS = {
     toolImage: "Photo",
     toolQr: "QR code",
     toolFrames: "Frames",
+    toolLogo: "THNDR logo",
     clearAll: "Clear all",
     confirmClear: "Clear everything from the label?",
 
@@ -302,6 +319,8 @@ const STRINGS = {
     loadFailedToast: "Loading failed",
     imageTooBig: "Image is too large (max 8 MB).",
     unsaved: "Unsaved changes",
+    saving: "Saving…",
+    leaveUnsaved: "You have unsaved changes.",
   },
 };
 
@@ -314,7 +333,9 @@ function esc(s) {
 
 function debounce(fn, ms) {
   let t;
-  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  const d = (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  d.cancel = () => clearTimeout(t);
+  return d;
 }
 
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
@@ -355,6 +376,7 @@ const STYLES = `
 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
 input{font:inherit;color:inherit}
 ha-icon{--mdc-icon-size:22px}
+.thndr-logo-icon{width:20px;height:auto;flex:none}
 
 /* minmax(0,1fr) — a plain 1fr track can never shrink below its items'
    min-content, so a topbar that is a hair wider than a phone screen would
@@ -387,8 +409,10 @@ ha-icon{--mdc-icon-size:22px}
 .name:hover{border-color:var(--la-line)}
 .name:focus{outline:none;border-color:var(--la-accent-2);background:rgba(108,92,231,.06)}
 .dirty-dot{width:9px;height:9px;border-radius:50%;background:#fdcb6e;flex:0 0 auto;
-  opacity:0;transition:opacity .2s}
+  opacity:0;transition:opacity .2s, background-color .2s}
 .dirty-dot.on{opacity:1}
+.dirty-dot.saving{opacity:1;background:var(--la-accent-2);animation:dot-pulse 1s ease-in-out infinite}
+@keyframes dot-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.6}}
 .top-actions{display:flex;align-items:center;gap:6px}
 .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;
   border-radius:12px;color:var(--la-text);transition:background .15s, transform .1s}
@@ -644,14 +668,26 @@ ha-icon{--mdc-icon-size:22px}
   .top-actions{gap:4px}
   .name{max-width:none;font-size:15px;padding:6px 8px}
 
-  /* Bottom toolbar: one horizontally scrollable row, 48px hit targets. */
-  .rail{flex-direction:row;justify-content:flex-start;gap:2px;border-right:none;
+  /* Bottom toolbar: one horizontally scrollable row, 48px hit targets.
+     iPhone: the display corners are rounded at the BOTTOM too, and
+     safe-area-inset-bottom only covers the home-indicator strip, not that
+     curvature — so the first/last tool sat half under the glass edge. Side
+     clearance is a fixed 18px (the curve's intrusion at toolbar height), or
+     the real inset when the phone is in landscape. The trailing clearance is
+     a flex spacer, not padding-right: WebKit drops end-padding in scroll
+     containers, which is exactly how the delete button went missing. */
+  .rail{flex-direction:row;justify-content:flex-start;gap:4px;border-right:none;
     border-top:1px solid var(--la-line);overflow-x:auto;scrollbar-width:none;
-    padding:6px 10px calc(6px + env(safe-area-inset-bottom));}
+    overscroll-behavior-x:contain;scroll-snap-type:x proximity;
+    padding:6px 0 calc(6px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));}
+  .rail::after{content:"";flex:0 0 max(18px, env(safe-area-inset-right, 0px))}
   .rail::-webkit-scrollbar{display:none}
-  .rail .tool{flex:0 0 48px;height:48px}
+  .rail .tool{flex:0 0 48px;height:48px;scroll-snap-align:start}
   .rail .spacer{display:none}
   .m-tool{display:flex}
+  /* iOS zooms the page when a focused field is under 16px; the name field
+     and props inputs were 15px, so every rename nudged the layout. */
+  .name,.props input,.props select,.props textarea{font-size:16px}
 
   .stage-inner{padding:14px}
   .zoom-fabs{right:10px;bottom:10px;gap:4px}
@@ -727,6 +763,7 @@ const SHELL = `
     <button class="tool" data-tool="image"><ha-icon icon="mdi:image-plus"></ha-icon></button>
     <button class="tool" data-tool="qr"><ha-icon icon="mdi:qrcode"></ha-icon></button>
     <button class="tool" data-tool="frames"><ha-icon icon="mdi:border-all-variant"></ha-icon></button>
+    <button class="tool" data-tool="logo"><svg class="thndr-logo-icon" viewBox="0 0 96 70"><path d="M48.0016 0L0 40.832H48.0016V70L96 29.1648H48.0016V0Z" fill="#FF7A00"/></svg></button>
     <button class="tool m-tool" data-tool="label"><ha-icon icon="mdi:format-color-fill"></ha-icon></button>
     <span class="spacer"></span>
     <button class="tool m-tool" data-tool="rotate"><ha-icon icon="mdi:phone-rotate-landscape"></ha-icon></button>
@@ -789,8 +826,22 @@ class LabelAssistantPanel extends HTMLElement {
     this._popover = null;
     this._stickerCat = STICKERS[0].id;
     this._updateBwDebounced = debounce(() => this._updateBw(), 350);
+    // Autosave: Canva/Docs-style — the explicit Save button and Ctrl/Cmd+S
+    // still work (and still toast), this just means forgetting to press
+    // them no longer costs you the design. Debounced so a drag or a burst of
+    // typing is one save, not one per keystroke.
+    this._autosaveDebounced = debounce(() => this._save({ silent: true }), 2000);
+    this._nudgeCommitDebounced = debounce(() => this._pushHistory(), 400);
     this._onKeyBound = (e) => this._onKey(e);
     this._onDocClickBound = (e) => this._onDocClick(e);
+    // Autosave covers the normal case; this covers the 2 s window between the
+    // last edit and the debounce firing (or a save still in flight) when the
+    // tab is closed or reloaded.
+    this._onBeforeUnloadBound = (e) => {
+      if (!this._dirty && !this._saveInFlight) return;
+      e.preventDefault();
+      e.returnValue = this.t("leaveUnsaved");
+    };
   }
 
   /* --------------------------------------------------------- HA plumbing */
@@ -812,10 +863,15 @@ class LabelAssistantPanel extends HTMLElement {
     if (!this._built && this._hass) this._init();
     document.addEventListener("keydown", this._onKeyBound);
     document.addEventListener("pointerdown", this._onDocClickBound, true);
+    window.addEventListener("beforeunload", this._onBeforeUnloadBound);
   }
   disconnectedCallback() {
     document.removeEventListener("keydown", this._onKeyBound);
     document.removeEventListener("pointerdown", this._onDocClickBound, true);
+    window.removeEventListener("beforeunload", this._onBeforeUnloadBound);
+    // Sidebar navigation inside HA fires no beforeunload: flush instead of
+    // asking, so leaving the panel never loses the last edit.
+    if (this._dirty && this._ready) this._save({ silent: true });
     if (this._unsub) { try { this._unsub.then((u) => u()); } catch (e) {} this._unsub = null; }
   }
 
@@ -891,7 +947,7 @@ class LabelAssistantPanel extends HTMLElement {
     const toolTips = {
       select: "toolSelect", text: "toolText", shapes: "toolShapes",
       stickers: "toolStickers", image: "toolImage", qr: "toolQr",
-      frames: "toolFrames", clear: "clearAll",
+      frames: "toolFrames", logo: "toolLogo", clear: "clearAll",
       label: "background", rotate: "rotate", bw: "bwPreview",
     };
     this.shadowRoot.querySelectorAll(".tool").forEach((b) => {
@@ -1139,7 +1195,50 @@ class LabelAssistantPanel extends HTMLElement {
     c.on("text:editing:entered", () => this._closeSheet());
     c.on("text:editing:exited", () => this._openSheet());
     c.on("after:render", () => { if (this._bwOn) this._updateBwDebounced(); });
+    this._initTouchZoom();
     this._fitZoom();
+  }
+
+  /* Pinch to zoom + two-finger pan on the stage. HA's viewport disables
+     browser pinch, and once zoomed in the canvas covers the whole stage, so
+     one-finger drags all go to Fabric and there was no way left to pan on a
+     phone except the zoom FABs. Capture phase + stopPropagation keeps the
+     second finger away from Fabric, which otherwise treats it as a drag. */
+  _initTouchZoom() {
+    const stage = this.$("stage");
+    let pinch = null;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const mid = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    const start = (e) => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault(); e.stopPropagation();
+      this._canvas.discardActiveObject();
+      this._canvas.requestRenderAll();
+      pinch = { d: dist(e.touches), m: mid(e.touches), zoom: this._zoom };
+    };
+    const move = (e) => {
+      if (!pinch || e.touches.length !== 2) return;
+      e.preventDefault(); e.stopPropagation();
+      const m = mid(e.touches);
+      const next = clamp(pinch.zoom * (dist(e.touches) / pinch.d), 0.08, 3);
+      // Zoom about the pinch midpoint: keep the canvas point under the
+      // fingers where it is, then apply the two-finger pan on top.
+      const r = stage.getBoundingClientRect();
+      const cx = stage.scrollLeft + (pinch.m.x - r.left);
+      const cy = stage.scrollTop + (pinch.m.y - r.top);
+      const k = next / this._zoom;
+      this._userZoom = true;
+      this._zoom = next;
+      this._applyZoom();
+      stage.scrollLeft = cx * k - (m.x - r.left);
+      stage.scrollTop = cy * k - (m.y - r.top);
+      pinch.zoom = next; pinch.d = dist(e.touches); pinch.m = m;
+    };
+    const end = (e) => { if (e.touches.length < 2) pinch = null; };
+    stage.addEventListener("touchstart", start, { capture: true, passive: false });
+    stage.addEventListener("touchmove", move, { capture: true, passive: false });
+    stage.addEventListener("touchend", end, { capture: true });
+    stage.addEventListener("touchcancel", end, { capture: true });
   }
 
   _labelSize() {
@@ -1247,11 +1346,23 @@ class LabelAssistantPanel extends HTMLElement {
     this.$("btn-redo").disabled = this._historyPos >= this._history.length - 1;
   }
 
-  _markDirty() { this._setDirty(true); }
+  _markDirty() {
+    this._setDirty(true);
+    if (this._ready) this._autosaveDebounced();
+  }
   _setDirty(v) {
     this._dirty = v;
     const dot = this.$("dirty");
-    if (dot) dot.classList.toggle("on", v);
+    if (dot) {
+      dot.classList.toggle("on", v);
+      dot.title = this.t(v ? "unsaved" : "saved");
+    }
+  }
+  _setSaving(v) {
+    const dot = this.$("dirty");
+    if (!dot) return;
+    dot.classList.toggle("saving", v);
+    if (v) dot.title = this.t("saving");
   }
 
   /* ------------------------------------------------------------ snapping */
@@ -1292,6 +1403,7 @@ class LabelAssistantPanel extends HTMLElement {
       case "image": this.$("file-input").click(); break;
       case "qr": this._openQrModal(null); break;
       case "frames": this._openFramesPopover(btn); break;
+      case "logo": this._addLogo(); break;
       // Mobile-only rail tools; their topbar twins are hidden on narrow.
       case "rotate": this._toggleOrientation(); break;
       case "bw": this._toggleBw(); break;
@@ -1408,6 +1520,25 @@ class LabelAssistantPanel extends HTMLElement {
       });
       this._addAndSelect(img);
     });
+  }
+
+  /* --------------------------------------------------------------- logo */
+  // THNDR beeldmerk (brandbook: thndr.studio/brandbook), vendored as a
+  // static asset rather than fetched live, same offline-first reasoning as
+  // the vendored fonts: this panel must keep working with no internet.
+  _addLogo() {
+    const f = window.fabric;
+    const { w, h } = this._labelSize();
+    f.Image.fromURL(`${BASE}/images/thndr-logo.svg`, (img) => {
+      const maxW = w * 0.3;
+      const scale = maxW / img.width;
+      img.set({
+        left: w / 2, top: h / 2, originX: "center", originY: "center",
+        scaleX: scale, scaleY: scale, laType: "image",
+      });
+      this._addAndSelect(img);
+    });
+    this._closePopover();
   }
 
   /* ------------------------------------------------------------------ QR */
@@ -2072,7 +2203,9 @@ class LabelAssistantPanel extends HTMLElement {
         if (!confirm(this.t("confirmDelete", del.dataset.delName))) return;
         try {
           await this._ws("delete_design", { design_id: del.dataset.del });
-          if (this._designId === del.dataset.del) { this._designId = null; this._markDirty(); }
+          // _setDirty, not _markDirty: the latter would autosave the open
+          // canvas 2 s later and resurrect the design that was just deleted.
+          if (this._designId === del.dataset.del) { this._designId = null; this._setDirty(true); }
         } catch (err) { this._toast(this.t("deleteFailedToast"), false); }
         return;
       }
@@ -2086,8 +2219,18 @@ class LabelAssistantPanel extends HTMLElement {
   }
 
   /* ------------------------------------------------------ new/load/save */
+  // Switching designs with an autosave still pending would otherwise fire
+  // 2 s later on the NEW canvas, dropping the old design's last edit. Save
+  // the old one right now instead (the payload is built synchronously, so
+  // it is captured before the canvas gets cleared).
+  _flushAutosave() {
+    this._autosaveDebounced.cancel();
+    if (this._dirty && this._ready) this._save({ silent: true });
+  }
+
   _newBlank(orientation, opts = {}) {
     const c = this._canvas;
+    if (!opts.silent) this._flushAutosave();
     this._restoring = true;
     c.discardActiveObject();
     c.clear();
@@ -2110,6 +2253,7 @@ class LabelAssistantPanel extends HTMLElement {
   }
 
   async _loadDesign(designId) {
+    this._flushAutosave();
     try {
       const design = await this._ws("load_design", { design_id: designId });
       this._restoring = true;
@@ -2162,11 +2306,41 @@ class LabelAssistantPanel extends HTMLElement {
     } catch (e) { return undefined; }
   }
 
-  async _save() {
+  async _save({ silent = false } = {}) {
     if (!this._ready) return;
+    // An autosave firing while a manual save (or an earlier autosave) is
+    // still in flight would race it for the design id; coalesce instead.
+    if (this._saveInFlight) { this._saveQueued = true; return; }
+    this._saveInFlight = true;
+    this._setSaving(true);
+    try {
+      await this._saveNow({ silent });
+    } finally {
+      this._saveInFlight = false;
+      this._setSaving(false);
+      if (this._saveQueued) { this._saveQueued = false; this._save({ silent: true }); }
+    }
+  }
+
+  async _saveNow({ silent }) {
     const name = (this._designName || "").trim() || this._defaultName();
-    this._canvas.discardActiveObject();
-    this._canvas.renderAll();
+    // Autosave must not kick the user out of what they're doing: keep the
+    // selection and the in-progress text edit alive, only the manual save
+    // "commits" by deselecting like it always did.
+    const objs = this._canvas.getObjects();
+    const editing = objs.some((o) => o.isEditing);
+    if (!silent) {
+      this._canvas.discardActiveObject();
+      this._canvas.renderAll();
+    } else if (editing) {
+      // Mid-keystroke: leave it, the next debounce tick catches the rest.
+      this._autosaveDebounced();
+      return;
+    } else if (!this._designId && !objs.length && !(this._designName || "").trim()) {
+      // A fresh, still-empty canvas is not a design yet; autosaving it would
+      // fill the gallery with blank "Untitled" cards.
+      return;
+    }
     const geo = this._label || this._fallbackGeo();
     const payload = {
       name,
@@ -2188,8 +2362,12 @@ class LabelAssistantPanel extends HTMLElement {
         this.$("name").value = name;
       }
       this._setDirty(false);
-      this._toast(this.t("savedToast"), true);
+      if (!silent) this._toast(this.t("savedToast"), true);
+      // (The gallery follows by itself: save_design pushes new state over
+      // the subscription and _onState re-renders it when open.)
     } catch (err) {
+      // A failed autosave is never silent: that is exactly the moment the
+      // user must know their work is not on disk.
       this._toast(`${this.t("saveFailedToast")}${err && err.message ? ": " + err.message : ""}`, false);
     }
   }
@@ -2537,6 +2715,9 @@ class LabelAssistantPanel extends HTMLElement {
         o.setCoords();
       });
       this._canvas.requestRenderAll();
+      // Nudges never reached history, so they were neither undoable nor
+      // autosaved until the next unrelated edit. One entry per burst.
+      this._nudgeCommitDebounced();
     }
   }
 }

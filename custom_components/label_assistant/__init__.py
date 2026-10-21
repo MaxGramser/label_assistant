@@ -94,6 +94,8 @@ async def _async_register_static(hass: HomeAssistant) -> None:
                              str(panel_dir / "vendor"), True),
             StaticPathConfig(f"{URL_BASE}/fonts",
                              str(panel_dir / "fonts"), True),
+            StaticPathConfig(f"{URL_BASE}/images",
+                             str(panel_dir / "images"), True),
         ]
     )
     hass.data[DOMAIN][_STATIC_REGISTERED] = True
